@@ -1,8 +1,17 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PlusCircle, AlertCircle } from "lucide-react";
+import { 
+  Table, 
+  TableBody, 
+  TableCaption, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from "@/components/ui/table";
+import RecurringTaskGenerator from "@/components/RecurringTaskGenerator";
 
 const Tasks = () => {
   return (
@@ -20,6 +29,7 @@ const Tasks = () => {
           <TabsTrigger value="today">Today</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming</TabsTrigger>
           <TabsTrigger value="completed">Completed</TabsTrigger>
+          <TabsTrigger value="recurring">Recurring</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
@@ -76,6 +86,39 @@ const Tasks = () => {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="recurring" className="space-y-4">
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card>
+              <CardContent className="p-6">
+                <h3 className="font-medium text-lg mb-4">Recurring Task Configurations</h3>
+                <Table>
+                  <TableCaption>Your recurring task configurations</TableCaption>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Title</TableHead>
+                      <TableHead>Frequency</TableHead>
+                      <TableHead>Created</TableHead>
+                      <TableHead>Next</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center py-8">
+                        <div className="flex flex-col items-center gap-2">
+                          <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                          <p>No recurring tasks configured yet</p>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+            
+            <RecurringTaskGenerator />
+          </div>
         </TabsContent>
       </Tabs>
     </div>
