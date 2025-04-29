@@ -1,4 +1,3 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Get environment variables for Supabase configuration
@@ -95,8 +94,32 @@ CREATE INDEX idx_tasks_due_date ON public.tasks(due_date);
 CREATE INDEX idx_tasks_original_task_id ON public.tasks(original_task_id);
 `;
 
+// Define types for task and filter functions
+interface TaskData {
+  id?: string;
+  user_id?: string;
+  title: string;
+  description?: string | null;
+  status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
+  due_date?: string | null;
+  completed_at?: string | null;
+  estimate_minutes?: number | null;
+  actual_minutes?: number | null;
+  original_task_id?: string | null;
+  tags?: string[] | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+interface TaskFilters {
+  status?: string;
+  due_date?: string;
+  [key: string]: any; // Allow for additional filter properties
+}
+
 // Task management functions
-export const createTask = async (taskData) => {
+export const createTask = async (taskData: TaskData) => {
   const { data, error } = await supabase
     .from('tasks')
     .insert(taskData)
@@ -105,7 +128,7 @@ export const createTask = async (taskData) => {
   return { data, error };
 };
 
-export const getTasks = async (filters = {}) => {
+export const getTasks = async (filters: TaskFilters = {}) => {
   let query = supabase
     .from('tasks')
     .select('*');
@@ -123,7 +146,7 @@ export const getTasks = async (filters = {}) => {
   return { data, error };
 };
 
-export const updateTask = async (id, updates) => {
+export const updateTask = async (id: string, updates: Partial<TaskData>) => {
   const { data, error } = await supabase
     .from('tasks')
     .update({
@@ -136,7 +159,7 @@ export const updateTask = async (id, updates) => {
   return { data, error };
 };
 
-export const deleteTask = async (id) => {
+export const deleteTask = async (id: string) => {
   const { error } = await supabase
     .from('tasks')
     .delete()
@@ -146,7 +169,19 @@ export const deleteTask = async (id) => {
 };
 
 // Recurring task functions
-export const createRecurring = async (recurringConfig) => {
+interface RecurringTaskConfig {
+  user_id: string;
+  task_template_id: string;
+  frequency: 'daily' | 'weekly' | 'monthly' | 'custom';
+  interval_count: number;
+  weekdays?: number[] | null;
+  month_day?: number | null;
+  start_date: string;
+  end_date?: string | null;
+  max_instances?: number | null;
+}
+
+export const createRecurring = async (recurringConfig: RecurringTaskConfig) => {
   const { data, error } = await supabase
     .from('recurring_tasks')
     .insert(recurringConfig)
