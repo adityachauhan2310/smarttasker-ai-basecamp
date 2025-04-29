@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -109,7 +109,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
         if (error) throw error;
         
         // Then create any dependencies
-        if (values.dependencies.length > 0) {
+        if (values.dependencies.length > 0 && newTask) {
           const dependencyPromises = values.dependencies.map(prerequisiteId => 
             supabase
               .from('task_dependencies')

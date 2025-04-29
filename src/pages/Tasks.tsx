@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -17,7 +16,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import RecurringTaskGenerator from "@/components/RecurringTaskGenerator";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabase";
 import NewTaskDialog from "@/components/NewTaskDialog";
 import TaskDependencyBadge from "@/components/TaskDependencyBadge";
 import { format } from "date-fns";
@@ -30,13 +29,12 @@ const Tasks = () => {
   const fetchTasks = async (filter = {}) => {
     const { data: tasks, error } = await supabase
       .from('tasks')
-      .select('*, dependencies:task_dependencies!dependent_task_id(prerequisite_task_id)')
-      .order('created_at', { ascending: false });
+      .select('*, dependencies:task_dependencies!dependent_task_id(prerequisite_task_id)');
       
     if (error) throw error;
     
     // Fetch blocking tasks details for each task
-    const tasksWithDependencies = await Promise.all(tasks.map(async (task) => {
+    const tasksWithDependencies = await Promise.all((tasks || []).map(async (task) => {
       if (!task.dependencies || task.dependencies.length === 0) {
         return { ...task, blockingTasks: [] };
       }
@@ -146,7 +144,7 @@ const Tasks = () => {
         .select();
         
       if (error) throw error;
-      return data[0];
+      return data?.[0];
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
