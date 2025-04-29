@@ -1,8 +1,9 @@
+
 import { createClient } from '@supabase/supabase-js';
 
-// Get environment variables for Supabase configuration
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Use the same URL and key as in src/integrations/supabase/client.ts
+const supabaseUrl = "https://qoojbxdvdvbwibdkaper.supabase.co";
+const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvb2pieGR2ZHZid2liZGthcGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5MjM5MzgsImV4cCI6MjA2MTQ5OTkzOH0.goflhN-7kpZYqlqtLbPucScTyYs_40nIqANQpk4Tjj8";
 
 // Create a Supabase client
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
