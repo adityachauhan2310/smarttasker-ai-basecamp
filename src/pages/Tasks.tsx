@@ -136,7 +136,7 @@ const Tasks = () => {
 
   // Status update mutation
   const updateTaskStatusMutation = useMutation({
-    mutationFn: async ({ id, status }) => {
+    mutationFn: async ({ id, status }: { id: string; status: string }) => {
       const { data, error } = await supabase
         .from('tasks')
         .update({ status, updated_at: new Date() })

@@ -1,6 +1,6 @@
 
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, LockClosed } from "lucide-react";
+import { CheckCircle, Lock } from "lucide-react";
 
 interface TaskDependencyBadgeProps {
   task: {
@@ -21,7 +21,7 @@ const TaskDependencyBadge = ({ task }: TaskDependencyBadgeProps) => {
       {isCompleted ? (
         <CheckCircle className="h-3 w-3" />
       ) : (
-        <LockClosed className="h-3 w-3" />
+        <Lock className="h-3 w-3" />
       )}
       <span className="max-w-[100px] truncate">{task.title}</span>
     </Badge>
