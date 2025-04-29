@@ -1,1 +1,5 @@
+
 project_id = "qoojbxdvdvbwibdkaper"
+
+[functions.prioritize-tasks]
+verify_jwt = true
