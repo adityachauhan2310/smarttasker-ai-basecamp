@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "@/hooks/use-toast";
@@ -93,6 +92,11 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
   const createTaskMutation = useMutation({
     mutationFn: async (values: TaskFormValues) => {
       try {
+        // Get the current user's session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError) throw sessionError;
+        if (!session) throw new Error('You must be logged in to create tasks');
+
         // First create the new task
         const { data: newTask, error } = await supabase
           .from('tasks')
@@ -101,7 +105,8 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
             description: values.description || null,
             priority: values.priority,
             status: values.status,
-            due_date: values.due_date ? values.due_date.toISOString() : null
+            due_date: values.due_date ? values.due_date.toISOString() : null,
+            user_id: session.user.id  // Add the user_id from the session
           })
           .select()
           .single();
@@ -116,7 +121,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
               .insert({
                 dependent_task_id: newTask.id,
                 prerequisite_task_id: prerequisiteId,
-                user_id: newTask.user_id
+                user_id: session.user.id  // Add the user_id from the session
               })
           );
           
@@ -139,11 +144,11 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
       form.reset();
       setSelectedDependencies([]);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error('Error creating task:', error);
       toast({
         title: "Error creating task",
-        description: error.message,
+        description: error.message || "Failed to create task. Please try again.",
         variant: "destructive",
       });
     }

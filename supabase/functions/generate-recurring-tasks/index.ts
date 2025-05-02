@@ -1,4 +1,3 @@
-
 // Follow this setup guide to integrate the Deno language server with your editor:
 // https://deno.land/manual/getting_started/setup_your_environment
 // This enables autocomplete, go to definition, etc.
@@ -35,6 +34,26 @@ interface Task {
   priority: string;
   due_date: string | null;
   tags: string[] | null;
+}
+
+interface ProcessResult {
+  id: string;
+  tasksCreated?: number;
+  error?: string;
+  message?: string;
+  newTotal?: number;
+}
+
+interface TaskInstance {
+  user_id: string;
+  title: string;
+  description: string | null;
+  status: string;
+  priority: string;
+  due_date: string;
+  tags: string[] | null;
+  original_task_id: string;
+  recurring_task_id: string;
 }
 
 serve(async (req) => {
@@ -103,7 +122,7 @@ serve(async (req) => {
 
     console.log(`Found ${recurringConfigs.length} recurring task configs to process`)
 
-    const results = []
+    const results: ProcessResult[] = []
 
     // Process each recurring task config
     for (const config of recurringConfigs as RecurringTask[]) {
@@ -122,153 +141,8 @@ serve(async (req) => {
         continue
       }
 
-      // Determine the date range to generate tasks for
-      const startDate = new Date(config.last_generated_date ? 
-        new Date(config.last_generated_date).getTime() + 24*60*60*1000 : // day after last generated
-        config.start_date) // or the start date if no tasks generated yet
-      
-      // Don't generate tasks before today
-      if (startDate < today) {
-        startDate.setTime(today.getTime())
-      }
-      
-      // Don't generate beyond the end date if set
-      const endDate = config.end_date && new Date(config.end_date) < lookAheadDate ? 
-        new Date(config.end_date) : 
-        lookAheadDate
-
-      // Safety check - don't proceed if start date is after end date
-      if (startDate > endDate) {
-        results.push({
-          id: config.id,
-          message: 'No tasks to generate in the specified period'
-        })
-        continue
-      }
-
-      // Determine how many instances we have left to create (if max_instances is set)
-      const remainingInstances = config.max_instances ? 
-        config.max_instances - config.created_instances : 
-        Number.MAX_SAFE_INTEGER // No limit
-
-      // Safety valve - limit max tasks per run to prevent too many insertions
-      const MAX_TASKS_PER_RUN = 100
-      const tasksLimit = Math.min(remainingInstances, MAX_TASKS_PER_RUN)
-
-      if (tasksLimit <= 0) {
-        results.push({
-          id: config.id,
-          message: 'Max instances reached, no more tasks will be generated'
-        })
-        continue
-      }
-
-      const tasksToCreate = []
-      let createdCount = 0
-      let currentDate = new Date(startDate)
-
-      // Generate tasks according to frequency until we reach the end date or tasksLimit
-      switch(config.frequency) {
-        case 'daily':
-          while (currentDate <= endDate && createdCount < tasksLimit) {
-            // Skip dates that don't match the interval
-            const daysSinceStart = Math.floor((currentDate.getTime() - new Date(config.start_date).getTime()) / (24*60*60*1000))
-            if (daysSinceStart % config.interval_count === 0) {
-              tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
-              createdCount++
-            }
-            // Move to next day
-            currentDate.setDate(currentDate.getDate() + 1)
-          }
-          break
-          
-        case 'weekly':
-          while (currentDate <= endDate && createdCount < tasksLimit) {
-            // For weekly tasks, check if the current day of week is in the weekdays array
-            const dayOfWeek = currentDate.getDay() // 0 = Sunday, 1 = Monday, etc.
-            const weeksSinceStart = Math.floor((currentDate.getTime() - new Date(config.start_date).getTime()) / (7*24*60*60*1000))
-            
-            // Check if this week matches the interval and the day is in the weekdays array
-            if (weeksSinceStart % config.interval_count === 0 && 
-                (!config.weekdays || config.weekdays.includes(dayOfWeek))) {
-              tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
-              createdCount++
-            }
-            // Move to next day
-            currentDate.setDate(currentDate.getDate() + 1)
-          }
-          break
-          
-        case 'monthly':
-          while (currentDate <= endDate && createdCount < tasksLimit) {
-            const monthsSinceStart = 
-              (currentDate.getFullYear() - new Date(config.start_date).getFullYear()) * 12 + 
-              (currentDate.getMonth() - new Date(config.start_date).getMonth())
-            
-            // Check if this month matches the interval and day of month matches
-            if (monthsSinceStart % config.interval_count === 0 &&
-                (!config.month_day || currentDate.getDate() === config.month_day)) {
-              tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
-              createdCount++
-              
-              // For monthly, jump to the next month instead of incrementing days
-              currentDate.setMonth(currentDate.getMonth() + 1)
-              // Reset to desired day of month
-              if (config.month_day) {
-                currentDate.setDate(config.month_day)
-              }
-            } else {
-              // If not matching day, move to next day
-              currentDate.setDate(currentDate.getDate() + 1)
-            }
-          }
-          break
-      }
-
-      if (tasksToCreate.length > 0) {
-        // Insert the new task instances
-        const { data: newTasks, error: insertError } = await supabase
-          .from('tasks')
-          .insert(tasksToCreate)
-          .select('id')
-        
-        if (insertError) {
-          results.push({
-            id: config.id,
-            error: `Failed to insert tasks: ${insertError.message}`
-          })
-          continue
-        }
-        
-        // Update the recurring task config with new counts and last generated date
-        const { error: updateError } = await supabase
-          .from('recurring_tasks')
-          .update({
-            created_instances: config.created_instances + tasksToCreate.length,
-            last_generated_date: endDate.toISOString().split('T')[0],
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', config.id)
-        
-        if (updateError) {
-          results.push({
-            id: config.id,
-            error: `Tasks created but failed to update config: ${updateError.message}`
-          })
-          continue
-        }
-        
-        results.push({
-          id: config.id,
-          tasksCreated: tasksToCreate.length,
-          newTotal: config.created_instances + tasksToCreate.length
-        })
-      } else {
-        results.push({
-          id: config.id,
-          message: 'No tasks created in this period'
-        })
-      }
+      const result = await processRecurringConfig(supabase, config, templateTask, today, lookAheadDate)
+      results.push(result)
     }
 
     return new Response(JSON.stringify({ 
@@ -289,38 +163,232 @@ serve(async (req) => {
   }
 })
 
-// Helper function to create a new task instance from a template task
+// Helper function to calculate the date range for task generation
+function calculateDateRange(
+  config: RecurringTask,
+  today: Date,
+  lookAheadDate: Date
+): { startDate: Date; endDate: Date } {
+  const startDate = new Date(config.last_generated_date ? 
+    new Date(config.last_generated_date).getTime() + 24*60*60*1000 : // day after last generated
+    config.start_date) // or the start date if no tasks generated yet
+  
+  // Don't generate tasks before today
+  if (startDate < today) {
+    startDate.setTime(today.getTime())
+  }
+  
+  // Don't generate beyond the end date if set
+  const endDate = config.end_date && new Date(config.end_date) < lookAheadDate ? 
+    new Date(config.end_date) : 
+    lookAheadDate
+
+  return { startDate, endDate }
+}
+
+// Helper function to calculate remaining instances and task limit
+function calculateTaskLimits(
+  config: RecurringTask,
+  maxTasksPerRun: number = 100
+): { remainingInstances: number; tasksLimit: number } {
+  const remainingInstances = config.max_instances ? 
+    config.max_instances - config.created_instances : 
+    Number.MAX_SAFE_INTEGER // No limit
+
+  const tasksLimit = Math.min(remainingInstances, maxTasksPerRun)
+  
+  return { remainingInstances, tasksLimit }
+}
+
+// Helper function to create a task instance
 function createTaskInstance(
   template: Task, 
   config: RecurringTask, 
   dueDate: Date
-): any {
-  // Calculate the due date based on the template's due date
-  let taskDueDate = null
-  if (template.due_date) {
-    // If template has a due date, maintain the same time but change the date
-    const templateDueDate = new Date(template.due_date)
-    taskDueDate = new Date(dueDate)
-    taskDueDate.setHours(
-      templateDueDate.getHours(),
-      templateDueDate.getMinutes(),
-      templateDueDate.getSeconds()
-    )
-  } else {
-    // If no due date, use the generated date
-    taskDueDate = dueDate
+): TaskInstance {
+  return {
+    user_id: template.user_id,
+    title: template.title,
+    description: template.description,
+    status: 'pending',
+    priority: template.priority,
+    due_date: dueDate.toISOString(),
+    tags: template.tags,
+    original_task_id: template.id,
+    recurring_task_id: config.id
+  }
+}
+
+// Helper function to generate daily tasks
+export function generateDailyTasks(
+  config: RecurringTask,
+  templateTask: Task,
+  startDate: Date,
+  endDate: Date,
+  tasksLimit: number
+): TaskInstance[] {
+  const tasksToCreate: TaskInstance[] = []
+  let createdCount = 0
+  let currentDate = new Date(startDate)
+
+  while (currentDate <= endDate && createdCount < tasksLimit) {
+    const daysSinceStart = Math.floor((currentDate.getTime() - new Date(config.start_date).getTime()) / (24*60*60*1000))
+    if (daysSinceStart % config.interval_count === 0) {
+      tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
+      createdCount++
+    }
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+
+  return tasksToCreate
+}
+
+// Helper function to generate weekly tasks
+export function generateWeeklyTasks(
+  config: RecurringTask,
+  templateTask: Task,
+  startDate: Date,
+  endDate: Date,
+  tasksLimit: number
+): TaskInstance[] {
+  const tasksToCreate: TaskInstance[] = []
+  let createdCount = 0
+  let currentDate = new Date(startDate)
+
+  while (currentDate <= endDate && createdCount < tasksLimit) {
+    const dayOfWeek = currentDate.getDay()
+    const weeksSinceStart = Math.floor((currentDate.getTime() - new Date(config.start_date).getTime()) / (7*24*60*60*1000))
+    
+    if (weeksSinceStart % config.interval_count === 0 && 
+        (!config.weekdays || config.weekdays.includes(dayOfWeek))) {
+      tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
+      createdCount++
+    }
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+
+  return tasksToCreate
+}
+
+// Helper function to generate monthly tasks
+export function generateMonthlyTasks(
+  config: RecurringTask,
+  templateTask: Task,
+  startDate: Date,
+  endDate: Date,
+  tasksLimit: number
+): TaskInstance[] {
+  const tasksToCreate: TaskInstance[] = []
+  let createdCount = 0
+  let currentDate = new Date(startDate)
+
+  while (currentDate <= endDate && createdCount < tasksLimit) {
+    const monthsSinceStart = 
+      (currentDate.getFullYear() - new Date(config.start_date).getFullYear()) * 12 + 
+      (currentDate.getMonth() - new Date(config.start_date).getMonth())
+    
+    if (monthsSinceStart % config.interval_count === 0 &&
+        (!config.month_day || currentDate.getDate() === config.month_day)) {
+      tasksToCreate.push(createTaskInstance(templateTask, config, currentDate))
+      createdCount++
+    }
+    currentDate.setDate(currentDate.getDate() + 1)
+  }
+
+  return tasksToCreate
+}
+
+// Helper function to insert tasks and update config
+async function insertTasksAndUpdateConfig(
+  supabase: any,
+  tasksToCreate: TaskInstance[],
+  config: RecurringTask,
+  endDate: Date
+): Promise<{ success: boolean; error?: string }> {
+  // Insert the new task instances
+  const { data: newTasks, error: insertError } = await supabase
+    .from('tasks')
+    .insert(tasksToCreate)
+    .select('id')
+  
+  if (insertError) {
+    return { success: false, error: `Failed to insert tasks: ${insertError.message}` }
+  }
+  
+  // Update the recurring task config
+  const { error: updateError } = await supabase
+    .from('recurring_tasks')
+    .update({
+      created_instances: config.created_instances + tasksToCreate.length,
+      last_generated_date: endDate.toISOString().split('T')[0],
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', config.id)
+  
+  if (updateError) {
+    return { success: false, error: `Tasks created but failed to update config: ${updateError.message}` }
+  }
+  
+  return { success: true }
+}
+
+// Main function to process a single recurring task config
+async function processRecurringConfig(
+  supabase: any,
+  config: RecurringTask,
+  templateTask: Task,
+  today: Date,
+  lookAheadDate: Date
+): Promise<ProcessResult> {
+  // Calculate date range
+  const { startDate, endDate } = calculateDateRange(config, today, lookAheadDate)
+  
+  // Safety check - don't proceed if start date is after end date
+  if (startDate > endDate) {
+    return {
+      id: config.id,
+      message: 'No tasks to generate in the specified period'
+    }
+  }
+
+  // Calculate task limits
+  const { remainingInstances, tasksLimit } = calculateTaskLimits(config)
+  
+  if (tasksLimit <= 0) {
+    return {
+      id: config.id,
+      message: 'Max instances reached, no more tasks will be generated'
+    }
+  }
+
+  // Generate tasks based on frequency
+  let tasksToCreate: TaskInstance[] = []
+  switch(config.frequency) {
+    case 'daily':
+      tasksToCreate = generateDailyTasks(config, templateTask, startDate, endDate, tasksLimit)
+      break
+    case 'weekly':
+      tasksToCreate = generateWeeklyTasks(config, templateTask, startDate, endDate, tasksLimit)
+      break
+    case 'monthly':
+      tasksToCreate = generateMonthlyTasks(config, templateTask, startDate, endDate, tasksLimit)
+      break
+  }
+
+  if (tasksToCreate.length > 0) {
+    const result = await insertTasksAndUpdateConfig(supabase, tasksToCreate, config, endDate)
+    if (!result.success) {
+      return { id: config.id, error: result.error }
+    }
+    return {
+      id: config.id,
+      tasksCreated: tasksToCreate.length,
+      newTotal: config.created_instances + tasksToCreate.length
+    }
   }
 
   return {
-    user_id: config.user_id,
-    title: template.title,
-    description: template.description,
-    status: 'pending', // Always create new instances as pending
-    priority: template.priority,
-    due_date: taskDueDate.toISOString(),
-    original_task_id: config.task_template_id, // Link to original template task
-    tags: template.tags,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString()
+    id: config.id,
+    message: 'No tasks created in this period'
   }
 }

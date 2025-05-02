@@ -1,8 +1,8 @@
-
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Progress } from "@/components/ui/progress";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { fadeInUp } from '@/lib/animations';
 
 interface ProgressCardProps {
   title: string;
@@ -26,9 +26,9 @@ const ProgressCard = ({ title, value, maxValue, category, color = "bg-primary" }
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
+      variants={fadeInUp}
+      initial="hidden"
+      animate="visible"
     >
       <Card>
         <CardHeader className="pb-2">

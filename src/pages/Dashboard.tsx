@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, BarChart3, LineChart, Users } from "lucide-react";
@@ -9,16 +8,35 @@ import ProgressCard from "@/components/dashboard/ProgressCard";
 import StatisticsChart from "@/components/dashboard/StatisticsChart";
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ChatWidget from "@/components/dashboard/ChatWidget";
+import NewTaskDialog from "@/components/NewTaskDialog";
 import { motion } from "framer-motion";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/lib/supabase";
+import { useDemo } from '@/contexts/DemoContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { Task } from '@/types/task';
+import { useTasksData } from '@/hooks/useTasksData';
 
 const Dashboard = () => {
-  // This will be populated from Supabase once integrated
-  const [tasks, setTasks] = useState({
-    total: 24,
-    completed: 14,
-    upcoming: 7,
-    overdue: 3
-  });
+  const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
+  const { tasks, loading } = useTasksData();
+  const { isDemo, tasks: demoTasks } = useDemo();
+  const { user } = useAuth();
+  
+  const todoTasks = tasks.filter(task => task.status === 'todo');
+  const inProgressTasks = tasks.filter(task => task.status === 'in-progress');
+  const doneTasks = tasks.filter(task => task.status === 'done');
+
+  // Calculate task statistics
+  const tasksStats = {
+    total: tasks.length,
+    completed: tasks.filter(t => t.status === 'done').length,
+    upcoming: tasks.filter(t => t.status === 'todo').length,
+    overdue: tasks.filter(t => {
+      if (!t.dueDate) return false;
+      return new Date(t.dueDate) < new Date() && t.status !== 'done';
+    }).length
+  };
 
   const container = {
     hidden: { opacity: 0 },
@@ -35,14 +53,31 @@ const Dashboard = () => {
     show: { opacity: 1, y: 0 }
   };
 
+  if (loading) {
+    return <div>Loading...</div>;
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <Button className="gradient-bg hover:opacity-90 transition-opacity">
+        <Button onClick={() => setIsNewTaskDialogOpen(true)}>
           <PlusCircle className="mr-2 h-4 w-4" /> New Task
         </Button>
       </div>
+
+      {isDemo && !user && (
+        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
+          <p>You are viewing the demo version with sample data.</p>
+        </div>
+      )}
+
+      {/* Empty state for real users with no tasks */}
+      {user && tasks.length === 0 && (
+        <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4">
+          <p>You have no tasks yet. Click "New Task" to get started!</p>
+        </div>
+      )}
 
       <motion.div 
         className="grid gap-4 md:grid-cols-2 lg:grid-cols-4"
@@ -56,7 +91,7 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Total Tasks</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{tasks.total}</div>
+              <div className="text-2xl font-bold">{tasksStats.total}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -67,7 +102,7 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-green-600">{tasks.completed}</div>
+              <div className="text-2xl font-bold text-green-600">{tasksStats.completed}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -78,7 +113,7 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-blue-600">{tasks.upcoming}</div>
+              <div className="text-2xl font-bold text-blue-600">{tasksStats.upcoming}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -89,7 +124,7 @@ const Dashboard = () => {
               <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold text-red-600">{tasks.overdue}</div>
+              <div className="text-2xl font-bold text-red-600">{tasksStats.overdue}</div>
             </CardContent>
           </Card>
         </motion.div>
@@ -116,13 +151,19 @@ const Dashboard = () => {
               name="John Doe" 
               role="Team Lead" 
               status="online" 
-              taskCount={5} 
+              stats={{
+                tasksCompleted: 3,
+                tasksInProgress: 2
+              }}
             />
             <ProfileCard 
               name="Jane Smith" 
               role="Developer" 
-              status="busy" 
-              taskCount={8} 
+              status="away" 
+              stats={{
+                tasksCompleted: 5,
+                tasksInProgress: 3
+              }}
             />
           </div>
         </div>
@@ -161,8 +202,59 @@ const Dashboard = () => {
         </motion.div>
       </div>
 
-      {/* Chat Widget */}
-      <ChatWidget />
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card>
+          <CardHeader>
+            <CardTitle>To Do</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {todoTasks.map(task => (
+                <div key={task.id} className="p-2 border rounded">
+                  <h3 className="font-medium">{task.title}</h3>
+                  <p className="text-sm text-gray-500">{task.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>In Progress</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {inProgressTasks.map(task => (
+                <div key={task.id} className="p-2 border rounded">
+                  <h3 className="font-medium">{task.title}</h3>
+                  <p className="text-sm text-gray-500">{task.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Done</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {doneTasks.map(task => (
+                <div key={task.id} className="p-2 border rounded">
+                  <h3 className="font-medium">{task.title}</h3>
+                  <p className="text-sm text-gray-500">{task.description}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <NewTaskDialog 
+        open={isNewTaskDialogOpen}
+        onOpenChange={setIsNewTaskDialogOpen}
+        allTasks={tasks}
+      />
     </div>
   );
 };

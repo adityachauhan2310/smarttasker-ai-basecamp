@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { 
@@ -7,6 +6,8 @@ import {
 } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
+import { fadeInUp, chartLineAnimation, chartBarAnimation } from '@/lib/animations';
 
 // Sample data (will be replaced with real data later)
 const weeklyData = [
@@ -35,9 +36,9 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
   
   return (
     <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, delay: 0.2 }}
+      variants={fadeInUp}
+      initial="hidden"
+      animate="visible"
       className="w-full"
     >
       <Card className="w-full">
@@ -45,22 +46,20 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
           <div className="flex items-center justify-between">
             <CardTitle className="text-lg font-medium">{title}</CardTitle>
             <div className="flex gap-2">
-              <button 
+              <Button 
                 onClick={() => setChartType('line')}
-                className={`text-xs px-2 py-1 rounded ${chartType === 'line' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary'}`}
+                variant={chartType === 'line' ? 'default' : 'secondary'}
+                size="sm"
               >
                 Line
-              </button>
-              <button 
+              </Button>
+              <Button 
                 onClick={() => setChartType('bar')}
-                className={`text-xs px-2 py-1 rounded ${chartType === 'bar' 
-                  ? 'bg-primary text-primary-foreground' 
-                  : 'bg-secondary'}`}
+                variant={chartType === 'bar' ? 'default' : 'secondary'}
+                size="sm"
               >
                 Bar
-              </button>
+              </Button>
             </div>
           </div>
         </CardHeader>
@@ -84,13 +83,15 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
                       dataKey="tasks" 
                       stroke="#8884d8" 
                       strokeWidth={2}
-                      activeDot={{ r: 8 }} 
+                      activeDot={{ r: 8 }}
+                      animationDuration={1500}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="completed" 
                       stroke="#82ca9d" 
                       strokeWidth={2}
+                      animationDuration={1500}
                     />
                   </LineChart>
                 ) : (
@@ -100,8 +101,16 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="tasks" fill="#8884d8" />
-                    <Bar dataKey="completed" fill="#82ca9d" />
+                    <Bar 
+                      dataKey="tasks" 
+                      fill="#8884d8" 
+                      animationDuration={800}
+                    />
+                    <Bar 
+                      dataKey="completed" 
+                      fill="#82ca9d" 
+                      animationDuration={800}
+                    />
                   </BarChart>
                 )}
               </ResponsiveContainer>
@@ -120,13 +129,15 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
                       dataKey="tasks" 
                       stroke="#8884d8" 
                       strokeWidth={2}
-                      activeDot={{ r: 8 }} 
+                      activeDot={{ r: 8 }}
+                      animationDuration={1500}
                     />
                     <Line 
                       type="monotone" 
                       dataKey="completed" 
                       stroke="#82ca9d" 
                       strokeWidth={2}
+                      animationDuration={1500}
                     />
                   </LineChart>
                 ) : (
@@ -136,8 +147,16 @@ const StatisticsChart = ({ title }: StatisticsChartProps) => {
                     <YAxis />
                     <Tooltip />
                     <Legend />
-                    <Bar dataKey="tasks" fill="#8884d8" />
-                    <Bar dataKey="completed" fill="#82ca9d" />
+                    <Bar 
+                      dataKey="tasks" 
+                      fill="#8884d8" 
+                      animationDuration={800}
+                    />
+                    <Bar 
+                      dataKey="completed" 
+                      fill="#82ca9d" 
+                      animationDuration={800}
+                    />
                   </BarChart>
                 )}
               </ResponsiveContainer>

@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,7 +47,7 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="gradient-bg hover:opacity-90 transition-opacity">
+              <Button>
                 Save Changes
               </Button>
             </CardFooter>
@@ -88,7 +87,7 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="gradient-bg hover:opacity-90 transition-opacity">
+              <Button>
                 Save Changes
               </Button>
             </CardFooter>
@@ -135,7 +134,7 @@ const Settings = () => {
               </div>
             </CardContent>
             <CardFooter>
-              <Button className="gradient-bg hover:opacity-90 transition-opacity">
+              <Button>
                 Save Preferences
               </Button>
             </CardFooter>

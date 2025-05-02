@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Brain, Clock, CalendarCheck } from "lucide-react";
@@ -16,7 +15,7 @@ const Index = () => {
             SmartTasker helps you organize, prioritize, and complete your tasks with intelligent assistance.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button asChild size="lg" className="gradient-bg hover:opacity-90 transition-opacity">
+            <Button asChild size="lg">
               <Link to="/auth">Get Started</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
@@ -71,7 +70,7 @@ const Index = () => {
           <p className="text-xl text-muted-foreground mb-8">
             Join thousands of users who have transformed their productivity with SmartTasker.
           </p>
-          <Button asChild size="lg" className="gradient-bg hover:opacity-90 transition-opacity">
+          <Button asChild size="lg">
             <Link to="/auth">Sign Up Now</Link>
           </Button>
         </div>

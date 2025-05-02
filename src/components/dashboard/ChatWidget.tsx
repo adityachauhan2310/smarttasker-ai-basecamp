@@ -1,36 +1,101 @@
-
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageCircle, Send, X, Minimize2, Maximize2 } from 'lucide-react';
+import { MessageCircle, Send, X, Minimize2, Maximize2, Loader2, Search } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useChat } from '@/contexts/ChatContext';
+import { ChatMessage } from '@/components/chat/ChatMessage';
+import { processCommand, isCommand } from '@/lib/utils/chatCommands';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTasks } from '@/hooks/useTasks';
 
-const ChatWidget = () => {
+export default function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const [message, setMessage] = useState('');
-  const [conversation, setConversation] = useState<{type: 'user' | 'ai'; content: string}[]>([
-    { type: 'ai', content: 'Hello! How can I assist you today?' }
-  ]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  
+  const { user } = useAuth();
+  const { tasks, createTask, updateTask } = useTasks();
+  const { 
+    messages, 
+    sendMessage, 
+    isLoading, 
+    error,
+    clearError,
+    markAsRead,
+    addReaction,
+    removeReaction
+  } = useChat();
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
-  const handleSendMessage = async () => {
-    if (!message.trim()) return;
-    
-    const userMessage = message;
+  // Scroll to bottom when new messages arrive
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  // Handle keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Toggle chat with Cmd/Ctrl + K
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        setIsOpen(prev => !prev);
+      }
+      
+      // Toggle search with Cmd/Ctrl + F when chat is open
+      if (isOpen && (e.metaKey || e.ctrlKey) && e.key === 'f') {
+        e.preventDefault();
+        setIsSearching(prev => !prev);
+        if (!isSearching) {
+          setTimeout(() => searchInputRef.current?.focus(), 0);
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isOpen, isSearching]);
+
+  const handleSendMessage = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!message.trim() || isLoading) return;
+
+    const content = message.trim();
     setMessage('');
-    
-    // Add user message to conversation
-    setConversation(prev => [...prev, { type: 'user', content: userMessage }]);
-    
-    // Simulate AI reply (in a real app, this would make an API call)
-    setTimeout(() => {
-      setConversation(prev => [...prev, { 
-        type: 'ai', 
-        content: "I'm a simulated AI assistant. In the future, I'll connect to ChatGPT or Groq API!" 
-      }]);
-    }, 1000);
+
+    if (isCommand(content)) {
+      const response = await processCommand(content, {
+        tasks,
+        userId: user?.id || '',
+        createTask,
+        updateTask
+      });
+      
+      if (response) {
+        // Add system message with command response
+        await sendMessage(response);
+      }
+    } else {
+      await sendMessage(content);
+    }
   };
+
+  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  };
+
+  const filteredMessages = searchQuery
+    ? messages.filter(msg => 
+        msg.content.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : messages;
 
   return (
     <>
@@ -55,13 +120,13 @@ const ChatWidget = () => {
       <AnimatePresence>
         {isOpen && (
           <motion.div 
-            className="fixed bottom-4 right-4 z-50 w-80 rounded-lg bg-card border shadow-xl overflow-hidden flex flex-col"
-            style={{ height: isMinimized ? '48px' : '400px' }}
+            className="fixed bottom-4 right-4 z-50 w-96 rounded-lg bg-card border shadow-xl overflow-hidden flex flex-col"
+            style={{ height: isMinimized ? '48px' : '600px' }}
             initial={{ opacity: 0, y: 20, height: '48px' }}
             animate={{ 
               opacity: 1, 
               y: 0, 
-              height: isMinimized ? '48px' : '400px'
+              height: isMinimized ? '48px' : '600px'
             }}
             exit={{ opacity: 0, y: 20 }}
             transition={{ duration: 0.2 }}
@@ -71,8 +136,26 @@ const ChatWidget = () => {
               <div className="flex items-center gap-2">
                 <div className="h-2 w-2 rounded-full bg-green-400" />
                 <span className="font-medium">AI Assistant</span>
+                {error && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive"
+                    onClick={clearError}
+                  >
+                    {error}
+                  </Button>
+                )}
               </div>
               <div className="flex gap-1">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="h-6 w-6 text-primary-foreground hover:bg-primary/90"
+                  onClick={() => setIsSearching(!isSearching)}
+                >
+                  <Search className="h-4 w-4" />
+                </Button>
                 <Button 
                   variant="ghost" 
                   size="icon" 
@@ -92,65 +175,65 @@ const ChatWidget = () => {
               </div>
             </div>
             
-            {/* Chat conversation */}
+            {/* Search bar */}
+            <AnimatePresence>
+              {!isMinimized && isSearching && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="border-b"
+                >
+                  <div className="p-2">
+                    <Input
+                      ref={searchInputRef}
+                      placeholder="Search messages..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full"
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+            
+            {/* Chat messages */}
             {!isMinimized && (
               <>
-                <div className="flex-1 p-3 overflow-y-auto flex flex-col gap-3">
-                  <AnimatePresence>
-                    {conversation.map((msg, index) => (
-                      <motion.div
-                        key={index}
-                        className={`flex ${msg.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className={`flex gap-2 max-w-[85%] ${msg.type === 'user' ? 'flex-row-reverse' : ''}`}>
-                          {msg.type === 'ai' && (
-                            <Avatar className="h-8 w-8">
-                              <AvatarImage src="/placeholder.svg" />
-                              <AvatarFallback>AI</AvatarFallback>
-                            </Avatar>
-                          )}
-                          <div 
-                            className={`py-2 px-3 rounded-lg text-sm ${
-                              msg.type === 'user' 
-                                ? 'bg-primary text-primary-foreground' 
-                                : 'bg-secondary text-secondary-foreground'
-                            }`}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </AnimatePresence>
+                <div className="flex-1 p-4 overflow-y-auto space-y-4">
+                  {filteredMessages.map((msg) => (
+                    <ChatMessage
+                      key={msg.id}
+                      message={msg}
+                      onReaction={(emoji) => addReaction(msg.id, emoji)}
+                      onRemoveReaction={(emoji) => removeReaction(msg.id, emoji)}
+                    />
+                  ))}
+                  <div ref={messagesEndRef} />
                 </div>
                 
                 {/* Chat input */}
-                <div className="p-3 border-t bg-card">
-                  <form 
-                    className="flex gap-2"
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleSendMessage();
-                    }}
+                <form onSubmit={handleSendMessage} className="p-3 border-t flex gap-2">
+                  <Input
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder={`Type a message or try /help${isLoading ? '...' : ''}`}
+                    disabled={isLoading}
+                    className="flex-1"
+                  />
+                  <Button 
+                    type="submit" 
+                    size="icon"
+                    disabled={isLoading || !message.trim()}
                   >
-                    <Input 
-                      placeholder="Type your message..." 
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      type="submit" 
-                      size="icon" 
-                      disabled={!message.trim()}
-                    >
+                    {isLoading ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
                       <Send className="h-4 w-4" />
-                    </Button>
-                  </form>
-                </div>
+                    )}
+                  </Button>
+                </form>
               </>
             )}
           </motion.div>
@@ -158,6 +241,4 @@ const ChatWidget = () => {
       </AnimatePresence>
     </>
   );
-};
-
-export default ChatWidget;
+}

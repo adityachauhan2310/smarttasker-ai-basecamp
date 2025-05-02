@@ -1,67 +1,70 @@
-
 import { motion } from 'framer-motion';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { fadeInScale } from '@/lib/animations';
 
 interface ProfileCardProps {
   name: string;
   role: string;
   avatarUrl?: string;
-  status: 'online' | 'busy' | 'away' | 'offline';
-  taskCount: number;
+  status: 'online' | 'offline' | 'away';
+  stats: {
+    tasksCompleted: number;
+    tasksInProgress: number;
+  };
 }
 
-const statusColorMap = {
-  online: "bg-green-500",
-  busy: "bg-red-500",
-  away: "bg-amber-500",
-  offline: "bg-gray-500"
-};
-
-const ProfileCard = ({ name, role, avatarUrl, status, taskCount }: ProfileCardProps) => {
-  const getInitials = (name: string) => {
-    return name
-      .split(' ')
-      .map(part => part[0])
-      .join('')
-      .toUpperCase();
+const ProfileCard = ({ name, role, avatarUrl, status, stats }: ProfileCardProps) => {
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'online':
+        return 'bg-green-500';
+      case 'away':
+        return 'bg-yellow-500';
+      case 'offline':
+        return 'bg-gray-500';
+      default:
+        return 'bg-gray-500';
+    }
   };
-  
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
+      variants={fadeInScale}
+      initial="hidden"
+      animate="visible"
+      className="w-full"
     >
-      <Card>
-        <CardContent className="pt-6 text-center">
-          <div className="relative inline-block">
-            <Avatar className="h-20 w-20 border-4 border-background">
-              <AvatarImage src={avatarUrl} alt={name} />
-              <AvatarFallback className="text-lg">{getInitials(name)}</AvatarFallback>
-            </Avatar>
-            <span 
-              className={`absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-background ${statusColorMap[status]}`} 
-              title={`Status: ${status}`}
-            />
+      <Card className="w-full">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg font-medium">Profile</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <Avatar className="h-16 w-16">
+                <AvatarImage src={avatarUrl} alt={name} />
+                <AvatarFallback>{name.split(' ').map(n => n[0]).join('')}</AvatarFallback>
+              </Avatar>
+              <div className={`absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-white ${getStatusColor(status)}`} />
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold">{name}</h3>
+              <p className="text-sm text-muted-foreground">{role}</p>
+              <Badge variant="outline" className="mt-1">
+                {status.charAt(0).toUpperCase() + status.slice(1)}
+              </Badge>
+            </div>
           </div>
-          <div className="mt-4 space-y-2">
-            <h3 className="text-lg font-medium">{name}</h3>
-            <p className="text-sm text-muted-foreground">{role}</p>
-            <div className="flex justify-center gap-2">
-              <Badge variant="secondary">
-                {taskCount} active tasks
-              </Badge>
-              <Badge 
-                variant="outline" 
-                className={`${status === 'online' ? 'text-green-500 border-green-500' : 
-                            status === 'busy' ? 'text-red-500 border-red-500' : 
-                            status === 'away' ? 'text-amber-500 border-amber-500' : 
-                            'text-gray-500 border-gray-500'}`}
-              >
-                {status}
-              </Badge>
+          <div className="mt-4 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Tasks Completed</p>
+              <p className="text-2xl font-bold">{stats.tasksCompleted}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Tasks In Progress</p>
+              <p className="text-2xl font-bold">{stats.tasksInProgress}</p>
             </div>
           </div>
         </CardContent>

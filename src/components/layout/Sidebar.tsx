@@ -1,13 +1,15 @@
-
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import {
   LayoutDashboard,
   CheckSquare,
   Settings,
   X,
-  LogIn
+  LogIn,
+  LogOut,
+  MessageSquare
 } from "lucide-react";
 
 type SidebarProps = {
@@ -17,6 +19,14 @@ type SidebarProps = {
 
 export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, signOut } = useAuth();
+  
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/auth');
+  };
+
   const isActive = (path: string) => location.pathname === path;
 
   const navigation = [
@@ -29,6 +39,11 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
       name: "Tasks",
       path: "/tasks",
       icon: CheckSquare,
+    },
+    {
+      name: "Chat",
+      path: "/chat",
+      icon: MessageSquare,
     },
     {
       name: "Settings",
@@ -98,16 +113,32 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
           </nav>
 
           <div className="p-4">
-            <Button
-              variant="outline"
-              className="w-full justify-start"
-              asChild
-            >
-              <Link to="/auth">
-                <LogIn className="mr-2 h-5 w-5" />
-                Sign In
-              </Link>
-            </Button>
+            {user ? (
+              <div className="space-y-4">
+                <div className="px-2 py-2 rounded-lg bg-muted">
+                  <p className="text-sm font-medium">{user.email}</p>
+                </div>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start text-destructive hover:text-destructive"
+                  onClick={handleLogout}
+                >
+                  <LogOut className="mr-2 h-5 w-5" />
+                  Sign Out
+                </Button>
+              </div>
+            ) : (
+              <Button
+                variant="outline"
+                className="w-full justify-start"
+                asChild
+              >
+                <Link to="/auth">
+                  <LogIn className="mr-2 h-5 w-5" />
+                  Sign In
+                </Link>
+              </Button>
+            )}
           </div>
         </div>
       </div>

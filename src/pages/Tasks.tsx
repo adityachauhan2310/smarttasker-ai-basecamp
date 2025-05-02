@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -20,100 +20,58 @@ import { supabase } from "@/lib/supabase";
 import NewTaskDialog from "@/components/NewTaskDialog";
 import TaskDependencyBadge from "@/components/TaskDependencyBadge";
 import { format } from "date-fns";
+import TaskItem from "@/components/TaskItem";
+import { useTasksData } from '@/hooks/useTasksData';
 
 const Tasks = () => {
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
   const queryClient = useQueryClient();
-  
-  // Function to fetch tasks with dependencies
-  const fetchTasks = async (filter = {}) => {
-    const { data: tasks, error } = await supabase
-      .from('tasks')
-      .select('*, dependencies:task_dependencies!dependent_task_id(prerequisite_task_id)');
-      
-    if (error) throw error;
-    
-    // Fetch blocking tasks details for each task
-    const tasksWithDependencies = await Promise.all((tasks || []).map(async (task) => {
-      if (!task.dependencies || task.dependencies.length === 0) {
-        return { ...task, blockingTasks: [] };
-      }
-      
-      const prerequisiteIds = task.dependencies.map(d => d.prerequisite_task_id);
-      
-      const { data: blockingTasks, error: blockingError } = await supabase
-        .from('tasks')
-        .select('id, title, status')
-        .in('id', prerequisiteIds);
-        
-      if (blockingError) throw blockingError;
-      
-      return { ...task, blockingTasks: blockingTasks || [] };
-    }));
-    
-    return tasksWithDependencies;
-  };
+  const { tasks, loading, error } = useTasksData();
 
-  // Query for all tasks
-  const { data: allTasks, isLoading, error } = useQuery({
-    queryKey: ['tasks', 'all'],
-    queryFn: () => fetchTasks()
-  });
-  
   // Helper function to filter tasks
   const filterTasks = (tasks, filter) => {
     if (!tasks) return [];
-    
     switch(filter) {
       case 'today':
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
-        
         return tasks.filter(task => {
-          if (!task.due_date) return false;
-          const dueDate = new Date(task.due_date);
-          return dueDate >= today && dueDate < tomorrow && task.status !== 'completed';
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          return dueDate >= today && dueDate < tomorrow && task.status !== 'done';
         });
-        
       case 'upcoming':
         const currentDate = new Date();
         currentDate.setHours(0, 0, 0, 0);
-        
         return tasks.filter(task => {
-          if (!task.due_date) return false;
-          const dueDate = new Date(task.due_date);
-          return dueDate > currentDate && task.status !== 'completed';
+          if (!task.dueDate) return false;
+          const dueDate = new Date(task.dueDate);
+          return dueDate > currentDate && task.status !== 'done';
         });
-        
       case 'completed':
-        return tasks.filter(task => task.status === 'completed');
-        
+        return tasks.filter(task => task.status === 'done');
       case 'recurring':
         return tasks.filter(task => task.original_task_id !== null);
-        
       default:
         return tasks;
     }
   };
-  
+
   // Priority assignment mutation
   const prioritizeMutation = useMutation({
     mutationFn: async (taskId) => {
       const { data: session } = await supabase.auth.getSession();
-      
       if (!session?.session?.access_token) {
         throw new Error('You must be logged in to prioritize tasks');
       }
-      
       const response = await supabase.functions.invoke('prioritize-tasks', {
         body: { taskId },
         headers: { 
           Authorization: `Bearer ${session.session.access_token}`,
         },
       });
-      
       if (response.error) throw response.error;
       return response.data;
     },
@@ -142,7 +100,6 @@ const Tasks = () => {
         .update({ status, updated_at: new Date() })
         .eq('id', id)
         .select();
-        
       if (error) throw error;
       return data?.[0];
     },
@@ -158,12 +115,6 @@ const Tasks = () => {
       });
     }
   });
-  
-  // Check if task is blocked
-  const isTaskBlocked = (task) => {
-    if (!task.blockingTasks) return false;
-    return task.blockingTasks.some(bt => bt.status !== 'completed');
-  };
 
   // Render task table
   const renderTaskTable = (tasks) => {
@@ -182,7 +133,6 @@ const Tasks = () => {
         </Card>
       );
     }
-
     return (
       <Card>
         <CardContent className="p-0 overflow-x-auto">
@@ -199,75 +149,13 @@ const Tasks = () => {
             </TableHeader>
             <TableBody>
               {tasks.map((task) => (
-                <TableRow key={task.id}>
-                  <TableCell>{task.title}</TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        task.status === 'completed' ? 'outline' :
-                        task.status === 'in_progress' ? 'default' :
-                        'secondary'
-                      }
-                    >
-                      {task.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      variant={
-                        task.priority === 'high' ? 'destructive' :
-                        task.priority === 'medium' ? 'default' :
-                        'outline'
-                      }
-                    >
-                      {task.priority}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {task.due_date ? format(new Date(task.due_date), 'MMM d, yyyy') : '-'}
-                  </TableCell>
-                  <TableCell>
-                    {task.blockingTasks && task.blockingTasks.length > 0 ? (
-                      <div className="flex flex-wrap gap-1">
-                        {task.blockingTasks.map(blockingTask => (
-                          <TaskDependencyBadge 
-                            key={blockingTask.id}
-                            task={blockingTask}
-                          />
-                        ))}
-                      </div>
-                    ) : '-'}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex items-center space-x-2">
-                      {task.status !== 'completed' && (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => updateTaskStatusMutation.mutate({ 
-                              id: task.id, 
-                              status: 'completed' 
-                            })}
-                            disabled={isTaskBlocked(task)}
-                            title={isTaskBlocked(task) ? "Complete blocking tasks first" : "Mark as complete"}
-                          >
-                            <CheckCircle className="h-4 w-4" />
-                          </Button>
-                          
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => prioritizeMutation.mutate(task.id)}
-                            title="Auto-prioritize this task"
-                          >
-                            <ArrowUpCircle className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onStatusChange={(id, status) => 
+                    updateTaskStatusMutation.mutate({ id, status })
+                  }
+                />
               ))}
             </TableBody>
           </Table>
@@ -302,39 +190,39 @@ const Tasks = () => {
         </TabsList>
 
         <TabsContent value="all" className="space-y-4">
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center p-6">
               <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2">Loading tasks...</span>
             </div>
-          ) : renderTaskTable(allTasks)}
+          ) : renderTaskTable(tasks)}
         </TabsContent>
 
         <TabsContent value="today" className="space-y-4">
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center p-6">
               <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2">Loading tasks...</span>
             </div>
-          ) : renderTaskTable(filterTasks(allTasks, 'today'))}
+          ) : renderTaskTable(filterTasks(tasks, 'today'))}
         </TabsContent>
 
         <TabsContent value="upcoming" className="space-y-4">
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center p-6">
               <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2">Loading tasks...</span>
             </div>
-          ) : renderTaskTable(filterTasks(allTasks, 'upcoming'))}
+          ) : renderTaskTable(filterTasks(tasks, 'upcoming'))}
         </TabsContent>
 
         <TabsContent value="completed" className="space-y-4">
-          {isLoading ? (
+          {loading ? (
             <div className="flex justify-center p-6">
               <Clock className="h-6 w-6 animate-spin text-muted-foreground" />
               <span className="ml-2">Loading tasks...</span>
             </div>
-          ) : renderTaskTable(filterTasks(allTasks, 'completed'))}
+          ) : renderTaskTable(filterTasks(tasks, 'completed'))}
         </TabsContent>
 
         <TabsContent value="recurring" className="space-y-4">
@@ -374,7 +262,7 @@ const Tasks = () => {
       <NewTaskDialog 
         open={isNewTaskDialogOpen} 
         onOpenChange={setIsNewTaskDialogOpen}
-        allTasks={allTasks || []}
+        allTasks={tasks || []}
       />
     </div>
   );

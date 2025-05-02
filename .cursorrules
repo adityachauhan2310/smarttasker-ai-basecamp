@@ -1,0 +1,41 @@
+# Cursor Rules for SmartTasker AI Basecamp
+
+# Core Principles
+- Always think step by step
+- Favor small, testable edits
+- Preserve existing naming conventions
+
+# Code Style Guidelines
+- Follow TypeScript best practices
+- Use consistent indentation (2 spaces)
+- Maintain clear component structure
+- Keep functions focused and single-purpose
+
+# Testing Requirements
+- Write unit tests for new functionality
+- Ensure test coverage for critical paths
+- Follow AAA pattern (Arrange, Act, Assert)
+
+# Documentation Standards
+- Add JSDoc comments for functions
+- Include clear component descriptions
+- Document complex business logic
+
+# Performance Considerations
+- Profile code before optimization
+- Consider edge cases and error handling
+- Optimize database queries and API calls
+
+# Security Guidelines
+- Never expose sensitive data
+- Validate all user inputs
+- Follow secure authentication practices
+
+# Post-Change Verification
+- After each set of changes, ask Cursor:
+  "Summarize the refactors made in `tasksEdgeFunction.js` and `TaskItem.tsx`. List potential issues or edge cases to verify."
+- Document any breaking changes or dependencies
+- Verify backward compatibility
+- Check for performance regressions
+
+# These rules apply to all future prompts and code changes 
