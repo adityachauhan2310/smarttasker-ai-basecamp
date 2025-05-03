@@ -7,7 +7,7 @@ import { Loader2, Send } from 'lucide-react';
 import { format } from 'date-fns';
 
 const ChatInterface = () => {
-  const { state, sendMessage } = useChat();
+  const { state, sendMessage, clearChat } = useChat();
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -31,6 +31,17 @@ const ChatInterface = () => {
 
   return (
     <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto">
+      <div className="flex items-center justify-between px-4 pt-4">
+        <span className="font-semibold text-lg">Chat</span>
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={clearChat}
+        >
+          Clear Chat
+        </Button>
+      </div>
       <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {state.messages.map((message) => (

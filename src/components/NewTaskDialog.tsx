@@ -5,6 +5,10 @@ import { supabase } from "@/lib/supabase";
 import { z } from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { parseTaskFromText } from "@/lib/nlp";
+import { suggestTagsFromContent } from '@/lib/categorization';
+import { detectPriorityFromText } from '@/lib/priorityDetection';
+import { estimateTimeFromContent } from '@/lib/timeEstimation';
 
 import {
   Dialog,
@@ -51,6 +55,7 @@ import {
 } from "@/components/ui/command";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
+import { Label } from "@/components/ui/label";
 
 // Define form schema
 const taskFormSchema = z.object({
@@ -71,10 +76,6 @@ interface NewTaskDialogProps {
 }
 
 const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps) => {
-  const [selectedDependencies, setSelectedDependencies] = useState<string[]>([]);
-  const [dependencySearchOpen, setDependencySearchOpen] = useState(false);
-  const queryClient = useQueryClient();
-  
   // Initialize form
   const form = useForm<TaskFormValues>({
     resolver: zodResolver(taskFormSchema),
@@ -87,6 +88,17 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
       dependencies: []
     }
   });
+
+  const [selectedDependencies, setSelectedDependencies] = useState<string[]>([]);
+  const [dependencySearchOpen, setDependencySearchOpen] = useState(false);
+  const [quickAddText, setQuickAddText] = useState("");
+  const queryClient = useQueryClient();
+  const [showTagSuggestions, setShowTagSuggestions] = useState(true);
+  const [dueTime, setDueTime] = useState('');
+  const [showTimeEstimate, setShowTimeEstimate] = useState(false);
+  const titleValue = form.watch('title');
+  const descriptionValue = form.watch('description');
+  const timeEstimate = estimateTimeFromContent(`${titleValue} ${descriptionValue || ''}`);
   
   // Create task mutation
   const createTaskMutation = useMutation({
@@ -168,10 +180,39 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
     form.setValue("dependencies", newDependencies);
     setSelectedDependencies(newDependencies);
   };
-  
+
+  // Helper to clean up title
+  function cleanTitle(title: string) {
+    return title.replace(/[-–—]+/g, ' ').replace(/\s+/g, ' ').replace(/^\s+|\s+$/g, '').replace(/\s+([.,!?:;])/g, '$1');
+  }
+
+  // Only parse and fill form when user clicks button or presses Enter
+  const handleQuickAddParse = () => {
+    if (quickAddText.trim()) {
+      const parsedTask = parseTaskFromText(quickAddText);
+      console.log('Quick Add input:', quickAddText);
+      console.log('Parsed task:', parsedTask);
+      form.setValue("title", cleanTitle(parsedTask.title));
+      if (parsedTask.dueDate) {
+        form.setValue("due_date", new Date(parsedTask.dueDate));
+      }
+      if (parsedTask.priority) {
+        form.setValue("priority", parsedTask.priority);
+      }
+    }
+  };
+
+  // Compute tag suggestions based on title and description
+  const tagSuggestions = showTagSuggestions
+    ? suggestTagsFromContent(`${titleValue} ${descriptionValue || ''}`)
+    : [];
+
+  // Priority suggestion based on title and description
+  const prioritySuggestion = detectPriorityFromText(`${titleValue} ${descriptionValue || ''}`);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px]">
+      <DialogContent className="sm:max-w-[550px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Create New Task</DialogTitle>
           <DialogDescription>
@@ -180,7 +221,42 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
         </DialogHeader>
         
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2 pb-8">
+            <div className="space-y-2">
+              <Label htmlFor="quickAdd">Quick Add</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="quickAdd"
+                  placeholder="Type a task like 'Buy groceries tomorrow high priority'"
+                  value={quickAddText}
+                  onChange={(e) => setQuickAddText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleQuickAddParse();
+                    }
+                  }}
+                />
+                <Button type="button" onClick={handleQuickAddParse} variant="secondary">
+                  Fill Form
+                </Button>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Type a natural language description of your task. Click "Fill Form" or press Enter to parse and fill the form below.
+              </p>
+            </div>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">
+                  Or fill out the form below
+                </span>
+              </div>
+            </div>
+
             <FormField
               control={form.control}
               name="title"
@@ -212,6 +288,46 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
                 </FormItem>
               )}
             />
+
+            {/* Time Estimate Section */}
+            <div className="mt-1">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="px-2 py-0 text-xs text-muted-foreground hover:text-primary"
+                onClick={() => setShowTimeEstimate(v => !v)}
+                aria-expanded={showTimeEstimate}
+              >
+                {showTimeEstimate ? 'Hide' : 'Show'} time estimate
+              </Button>
+              {showTimeEstimate && (
+                <div className="mt-1 text-xs text-muted-foreground border rounded px-2 py-1 bg-muted">
+                  <span>Estimated time: </span>
+                  <span className="font-semibold">{timeEstimate}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Tag Suggestions UI */}
+            {showTagSuggestions && tagSuggestions.length > 0 && (
+              <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                <span>Suggested tags:</span>
+                {tagSuggestions.map(tag => (
+                  <span key={tag} className="bg-muted px-2 py-0.5 rounded-full border border-border">
+                    {tag}
+                  </span>
+                ))}
+                <button
+                  type="button"
+                  className="ml-2 underline text-xs text-muted-foreground hover:text-primary"
+                  onClick={() => setShowTagSuggestions(false)}
+                  tabIndex={-1}
+                >
+                  Hide suggestions
+                </button>
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -235,6 +351,20 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
                         <SelectItem value="high">High</SelectItem>
                       </SelectContent>
                     </Select>
+                    {/* Priority Suggestion UI */}
+                    {prioritySuggestion && (
+                      <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                        <span>Suggested:</span>
+                        <span className={
+                          prioritySuggestion === 'high' ? 'bg-destructive text-destructive-foreground' :
+                          prioritySuggestion === 'medium' ? 'bg-primary text-primary-foreground' :
+                          'bg-muted text-muted-foreground'
+                        + ' px-2 py-0.5 rounded-full border border-border font-semibold'}>
+                          {prioritySuggestion.charAt(0).toUpperCase() + prioritySuggestion.slice(1)}
+                        </span>
+                        <span className="text-muted-foreground">(AI suggestion)</span>
+                      </div>
+                    )}
                     <FormMessage />
                   </FormItem>
                 )}
@@ -273,37 +403,68 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Due Date</FormLabel>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <FormControl>
-                        <Button
-                          variant={"outline"}
-                          className={cn(
-                            "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
-                          )}
-                        >
-                          {field.value ? (
-                            format(field.value, "PPP")
-                          ) : (
-                            <span>Pick a date</span>
-                          )}
-                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
-                        </Button>
-                      </FormControl>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start">
-                      <Calendar
-                        mode="single"
-                        selected={field.value ?? undefined}
-                        onSelect={field.onChange}
-                        disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
-                        initialFocus
+                  <div className="flex flex-col gap-2 w-full">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button
+                            variant={"outline"}
+                            className={cn(
+                              "w-full pl-3 text-left font-normal",
+                              !field.value && "text-muted-foreground"
+                            )}
+                          >
+                            {field.value ? (
+                              format(field.value, "PPP")
+                            ) : (
+                              <span>Pick a date</span>
+                            )}
+                            <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={field.value ?? undefined}
+                          onSelect={date => {
+                            // If a time is already selected, combine date and time
+                            if (date && dueTime) {
+                              const [hours, minutes] = dueTime.split(":").map(Number);
+                              date.setHours(hours);
+                              date.setMinutes(minutes);
+                            }
+                            field.onChange(date);
+                          }}
+                          disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <div className="flex flex-col w-full">
+                      <Label htmlFor="dueTime">Time</Label>
+                      <Input
+                        id="dueTime"
+                        type="time"
+                        value={dueTime}
+                        onChange={e => {
+                          setDueTime(e.target.value);
+                          // If a date is already selected, update its time
+                          if (field.value && e.target.value) {
+                            const [hours, minutes] = e.target.value.split(":").map(Number);
+                            const newDate = new Date(field.value);
+                            newDate.setHours(hours);
+                            newDate.setMinutes(minutes);
+                            field.onChange(newDate);
+                          }
+                        }}
+                        className="mt-1"
+                        style={{ maxWidth: 160 }}
                       />
-                    </PopoverContent>
-                  </Popover>
+                    </div>
+                  </div>
                   <FormDescription>
-                    Optional due date for this task.
+                    Optional due date and time for this task.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -406,6 +567,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
                 variant="outline"
                 onClick={() => {
                   form.reset();
+                  setQuickAddText("");
                   onOpenChange(false);
                 }}
               >

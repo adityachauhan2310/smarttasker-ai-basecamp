@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, XCircle, ArrowUpCircle } from "lucide-react";
+import { CheckCircle, XCircle, ArrowUpCircle, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import TaskDependencyBadge from "./TaskDependencyBadge";
 import {
@@ -25,9 +25,10 @@ interface TaskItemProps {
     }>;
   };
   onStatusChange: (id: string, status: string) => void;
+  onDelete: () => void;
 }
 
-const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange }) => {
+const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange, onDelete }) => {
   // Check if task is blocked by incomplete dependencies
   const isBlocked = task.blockingTasks?.some(bt => bt.status !== 'completed') ?? false;
   
@@ -90,7 +91,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange }) => {
         <div className="flex items-center space-x-2">
           {task.status !== 'completed' && (
             <>
-              <TooltipProvider>
+              <TooltipProvider delayDuration={100}>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <span>
@@ -116,31 +117,62 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, onStatusChange }) => {
                         </ul>
                       </div>
                     ) : (
-                      "Mark as complete"
+                      "Mark as completed"
                     )}
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onStatusChange(task.id, 'in_progress')}
-                disabled={isBlocked}
-                className={isBlocked ? "opacity-50 cursor-not-allowed" : ""}
-              >
-                <ArrowUpCircle className="h-4 w-4" />
-              </Button>
-              
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => onStatusChange(task.id, 'pending')}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
+
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => onStatusChange(task.id, 'in_progress')}
+                        disabled={isBlocked}
+                        className={isBlocked ? "opacity-50 cursor-not-allowed" : ""}
+                      >
+                        <ArrowUpCircle className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Increase priority
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider delayDuration={100}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={onDelete}
+                      >
+                        <XCircle className="h-4 w-4" />
+                      </Button>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    Delete task
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </>
           )}
+          {task.status === 'completed' ? (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onDelete}
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          ) : null}
         </div>
       </td>
     </tr>

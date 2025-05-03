@@ -32,26 +32,28 @@ const Tasks = () => {
   const filterTasks = (tasks, filter) => {
     if (!tasks) return [];
     switch(filter) {
-      case 'today':
+      case 'today': {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const tomorrow = new Date(today);
         tomorrow.setDate(tomorrow.getDate() + 1);
         return tasks.filter(task => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          return dueDate >= today && dueDate < tomorrow && task.status !== 'done';
+          if (!task.due_date) return false;
+          const dueDate = new Date(task.due_date);
+          return dueDate >= today && dueDate < tomorrow && task.status !== 'completed';
         });
-      case 'upcoming':
+      }
+      case 'upcoming': {
         const currentDate = new Date();
         currentDate.setHours(0, 0, 0, 0);
         return tasks.filter(task => {
-          if (!task.dueDate) return false;
-          const dueDate = new Date(task.dueDate);
-          return dueDate > currentDate && task.status !== 'done';
+          if (!task.due_date) return false;
+          const dueDate = new Date(task.due_date);
+          return dueDate > currentDate && task.status !== 'completed';
         });
+      }
       case 'completed':
-        return tasks.filter(task => task.status === 'done');
+        return tasks.filter(task => task.status === 'completed');
       case 'recurring':
         return tasks.filter(task => task.original_task_id !== null);
       default:
@@ -116,6 +118,29 @@ const Tasks = () => {
     }
   });
 
+  // Delete task mutation
+  const deleteTaskMutation = useMutation({
+    mutationFn: async (id) => {
+      const { error } = await supabase.from('tasks').delete().eq('id', id);
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      toast({
+        title: 'Task deleted',
+        description: 'The task has been deleted.',
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error deleting task',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
   // Render task table
   const renderTaskTable = (tasks) => {
     if (!tasks || tasks.length === 0) {
@@ -155,6 +180,7 @@ const Tasks = () => {
                   onStatusChange={(id, status) => 
                     updateTaskStatusMutation.mutate({ id, status })
                   }
+                  onDelete={() => deleteTaskMutation.mutate(task.id)}
                 />
               ))}
             </TableBody>

@@ -2,6 +2,9 @@ import React, { createContext, useContext, useReducer, useCallback, ReactNode } 
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/lib/supabase';
 import { Task } from '@/types/task';
+import { createGroqClient } from '@/lib/groqClient';
+import { createTask } from '@/lib/supabase';
+import { parseTaskFromText } from '@/lib/nlp';
 
 export interface ChatMessage {
   id: string;
@@ -122,6 +125,12 @@ async function generateAIResponse(userMessage: string): Promise<string> {
   }
 }
 
+// Utility to extract JSON from a string (handles markdown/code blocks)
+function extractJsonFromString(str: string): string | null {
+  const match = str.match(/\{[\s\S]*\}/);
+  return match ? match[0] : null;
+}
+
 function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'ADD_MESSAGE':
@@ -159,6 +168,10 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
+const groqClient = createGroqClient({
+  apiKey: import.meta.env.VITE_GROQ_API_KEY,
+});
+
 export function ChatProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(chatReducer, initialState);
 
@@ -177,22 +190,142 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'SET_ERROR', payload: null });
 
     try {
-      // Generate AI response
-      const aiResponse = await generateAIResponse(content);
-      
-      // Add AI message
+      // Prompt for Groq
+      const prompt = `You are a smart task assistant. When a user sends a message, respond in this JSON format:\n{\n  "action": "create_task" | "list_tasks" | "other",\n  "task": {\n    "title": "...",\n    "due_date": "...",\n    "priority": "low" | "medium" | "high"\n  },\n  "response": "A friendly message to the user."\n}\nIf the user wants to create a task, fill in the task fields. If not, set action to "other".\nUser message: ${content}`;
+      let groqResult;
+      try {
+        groqResult = await groqClient.generateCompletion(prompt, { temperature: 0.2, maxTokens: 300 });
+      } catch (groqError) {
+        console.error('Groq API error:', groqError);
+        dispatch({ type: 'SET_ERROR', payload: 'Groq API error. Please check your API key and network.' });
+        return;
+      }
+      console.log('Groq raw response:', groqResult.content);
+      let groqJson;
+      try {
+        const jsonStr = extractJsonFromString(groqResult.content);
+        if (!jsonStr) throw new Error('No JSON found in Groq response');
+        groqJson = JSON.parse(jsonStr);
+      } catch (e) {
+        console.error('Groq JSON parse error:', e, groqResult.content);
+        // fallback to NLP if Groq response is not valid JSON
+        const parsed = parseTaskFromText(content);
+        if (parsed.title) {
+          // Try to create a task with fallback NLP
+          let data, error;
+          try {
+            ({ data, error } = await createTask({
+              title: parsed.title,
+              priority: parsed.priority || 'medium',
+              due_date: parsed.dueDate ? new Date(parsed.dueDate).toISOString() : null,
+              status: 'pending',
+              description: '',
+            }));
+          } catch (supabaseError) {
+            console.error('Supabase error (NLP fallback):', supabaseError);
+            dispatch({ type: 'SET_ERROR', payload: 'Supabase error. Please check your connection and authentication.' });
+            return;
+          }
+          let response = error ? 'Failed to create task.' : `Task "${parsed.title}" created!`;
+          const aiMessage: ChatMessage = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: response,
+            timestamp: new Date(),
+          };
+          dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          return;
+        } else {
+          // fallback to generic response
+          const aiMessage: ChatMessage = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: "Sorry, I couldn't understand your request.",
+            timestamp: new Date(),
+          };
+          dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+          return;
+        }
+      }
+
+      if (groqJson.action === 'create_task' && groqJson.task && groqJson.task.title) {
+        // Create the task in Supabase
+        let data, error;
+        let dueDateValue = null;
+        if (groqJson.task.due_date) {
+          const parsedDate = new Date(groqJson.task.due_date);
+          if (!isNaN(parsedDate.getTime())) {
+            dueDateValue = parsedDate.toISOString();
+          } else {
+            // Try to parse a date from the user message using NLP
+            const nlpParsed = parseTaskFromText(content);
+            if (nlpParsed.dueDate) {
+              const nlpDate = new Date(nlpParsed.dueDate);
+              if (!isNaN(nlpDate.getTime())) {
+                dueDateValue = nlpDate.toISOString();
+              } else {
+                dueDateValue = null;
+              }
+            } else {
+              dueDateValue = null;
+            }
+          }
+        }
+        let userId = null;
+        try {
+          const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+          if (sessionError || !sessionData?.session?.user?.id) {
+            throw new Error('User not authenticated. Please sign in.');
+          }
+          userId = sessionData.session.user.id;
+        } catch (authError) {
+          console.error('Supabase auth error:', authError);
+          dispatch({ type: 'SET_ERROR', payload: 'You must be signed in to create tasks.' });
+          return;
+        }
+        try {
+          ({ data, error } = await createTask({
+            title: groqJson.task.title,
+            priority: groqJson.task.priority || 'medium',
+            due_date: dueDateValue,
+            status: 'pending',
+            description: '',
+            user_id: userId,
+          }));
+        } catch (supabaseError) {
+          console.error('Supabase error (Groq intent):', supabaseError);
+          dispatch({ type: 'SET_ERROR', payload: 'Supabase error. Please check your connection and authentication.' });
+          return;
+        }
+        let response;
+        if (error) {
+          console.error('Supabase createTask error:', error);
+          response = error.message || 'Failed to create task.';
+        } else {
+          response = groqJson.response ? groqJson.response + '\nTask "' + groqJson.task.title + '" created!' : `Task "${groqJson.task.title}" created!`;
+        }
+        const aiMessage: ChatMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: response,
+          timestamp: new Date(),
+        };
+        dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+      } else {
+        // Default: reply with Groq's response
       const aiMessage: ChatMessage = {
         id: uuidv4(),
         role: 'assistant',
-        content: aiResponse,
+          content: groqJson.response || groqResult.content,
         timestamp: new Date(),
       };
       dispatch({ type: 'ADD_MESSAGE', payload: aiMessage });
+      }
     } catch (error) {
       console.error('Error in sendMessage:', error);
       dispatch({ 
         type: 'SET_ERROR', 
-        payload: 'Failed to generate response. Please try again.' 
+        payload: 'Unexpected error. Please check the console for details.' 
       });
     } finally {
       dispatch({ type: 'SET_LOADING', payload: false });

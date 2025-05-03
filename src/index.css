@@ -1,4 +1,3 @@
-
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -99,4 +98,11 @@
   .gradient-bg {
     @apply bg-gradient-to-br from-blue-500 to-blue-600;
   }
+}
+
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+}
+input[type="time"] {
+  color-scheme: dark;
 }
