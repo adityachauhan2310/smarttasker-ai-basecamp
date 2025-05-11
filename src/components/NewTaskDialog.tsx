@@ -403,7 +403,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
               render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel>Due Date</FormLabel>
-                  <div className="flex flex-col gap-2 w-full">
+                  <div className="flex flex-row gap-2 w-full items-end">
                     <Popover>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -441,7 +441,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
                         />
                       </PopoverContent>
                     </Popover>
-                    <div className="flex flex-col w-full">
+                    <div className="flex flex-col w-40">
                       <Label htmlFor="dueTime">Time</Label>
                       <Input
                         id="dueTime"

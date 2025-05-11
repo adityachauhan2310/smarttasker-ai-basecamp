@@ -110,6 +110,16 @@ async function generateAIResponse(userMessage: string): Promise<string> {
     }
 
     if (userMessage.toLowerCase().includes('completed')) {
+      // If the user asks for the count of completed tasks
+      if (
+        userMessage.toLowerCase().includes('how many') ||
+        userMessage.toLowerCase().includes('how much') ||
+        userMessage.toLowerCase().includes('count') ||
+        userMessage.toLowerCase().match(/\bnumber\b/)
+      ) {
+        return `You have completed ${completedTasks.length} tasks so far.`;
+      }
+      // Otherwise, show the list
       return completedTasks.length > 0
         ? `Here are your completed tasks:\n${completedTasks
             .map(task => `- ${task.title}`)

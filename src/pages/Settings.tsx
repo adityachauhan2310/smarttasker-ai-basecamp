@@ -5,8 +5,66 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 const Settings = () => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      setLoading(true);
+      setError('');
+      setMessage('');
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        setError('Could not fetch user.');
+        setLoading(false);
+        return;
+      }
+      setEmail(user.email || '');
+      // Fetch profile from 'profiles' table
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('name')
+        .eq('id', user.id)
+        .single();
+      if (profileError) {
+        setError('Could not fetch profile.');
+      } else {
+        setName(profile?.name || '');
+      }
+      setLoading(false);
+    };
+    fetchProfile();
+  }, []);
+
+  const handleSave = async () => {
+    setLoading(true);
+    setError('');
+    setMessage('');
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      setError('Could not fetch user.');
+      setLoading(false);
+      return;
+    }
+    // Upsert profile
+    const { error: upsertError } = await supabase
+      .from('profiles')
+      .upsert({ id: user.id, name });
+    if (upsertError) {
+      setError('Failed to update profile.');
+    } else {
+      setMessage('Profile updated successfully.');
+    }
+    setLoading(false);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -36,19 +94,21 @@ const Settings = () => {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Name</Label>
-                <Input id="name" placeholder="Your name" />
+                <Input id="name" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} disabled={loading} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" placeholder="Your email" type="email" disabled />
+                <Input id="email" placeholder="Your email" type="email" value={email} disabled />
                 <p className="text-sm text-muted-foreground">
                   Connect to Supabase to manage your email address.
                 </p>
               </div>
+              {message && <div className="text-green-600 text-sm">{message}</div>}
+              {error && <div className="text-red-600 text-sm">{error}</div>}
             </CardContent>
             <CardFooter>
-              <Button>
-                Save Changes
+              <Button onClick={handleSave} disabled={loading}>
+                {loading ? 'Saving...' : 'Save Changes'}
               </Button>
             </CardFooter>
           </Card>

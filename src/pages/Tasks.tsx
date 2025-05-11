@@ -118,6 +118,29 @@ const Tasks = () => {
     }
   });
 
+  // Priority update mutation
+  const updateTaskPriorityMutation = useMutation({
+    mutationFn: async ({ id, priority }: { id: string; priority: string }) => {
+      const { data, error } = await supabase
+        .from('tasks')
+        .update({ priority, updated_at: new Date() })
+        .eq('id', id)
+        .select();
+      if (error) throw error;
+      return data?.[0];
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error) => {
+      toast({
+        title: 'Error updating priority',
+        description: error.message,
+        variant: 'destructive',
+      });
+    }
+  });
+
   // Delete task mutation
   const deleteTaskMutation = useMutation({
     mutationFn: async (id) => {
@@ -179,6 +202,9 @@ const Tasks = () => {
                   task={task}
                   onStatusChange={(id, status) => 
                     updateTaskStatusMutation.mutate({ id, status })
+                  }
+                  onPriorityChange={(id, priority) =>
+                    updateTaskPriorityMutation.mutate({ id, priority })
                   }
                   onDelete={() => deleteTaskMutation.mutate(task.id)}
                 />

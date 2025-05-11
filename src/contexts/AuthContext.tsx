@@ -31,12 +31,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      // Ensure profile exists for the user (fire-and-forget)
+      if (session?.user) {
+        supabase.from('profiles').upsert({ id: session.user.id, name: session.user.email?.split('@')[0] || 'New User' })
+          .then(({ error }) => { if (error) console.error('Profile upsert error:', error); });
+      }
     });
 
     // Listen for changes on auth state (sign in, sign out, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
       setLoading(false);
+      // Ensure profile exists for the user (fire-and-forget)
+      if (session?.user) {
+        supabase.from('profiles').upsert({ id: session.user.id, name: session.user.email?.split('@')[0] || 'New User' })
+          .then(({ error }) => { if (error) console.error('Profile upsert error:', error); });
+      }
     });
 
     return () => subscription.unsubscribe();
