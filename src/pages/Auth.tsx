@@ -364,6 +364,10 @@ const Auth = () => {
     setIsLoading(true);
     try {
       await signIn(signInEmail, signInPassword);
+      // Request notification permission after successful login
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
       navigate('/dashboard');
     } catch (error) {
       toast({
@@ -381,6 +385,10 @@ const Auth = () => {
     setIsLoading(true);
     try {
       await signUp(signUpEmail, signUpPassword);
+      // Request notification permission after successful signup
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
       navigate('/dashboard');
     } catch (error) {
       toast({
@@ -422,6 +430,10 @@ const Auth = () => {
     setIsLoading(true);
     try {
       await signInWithGoogle();
+      // Request notification permission after successful Google sign-in
+      if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
     } catch (error) {
       toast({
         variant: "destructive",

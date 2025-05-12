@@ -1,25 +1,42 @@
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import { CheckCircle2, Brain, Clock, CalendarCheck } from "lucide-react";
+import { t } from "@/lib/i18n";
+import { useEffect, useState } from "react";
 
 const Index = () => {
+  const [, forceUpdate] = useState({});
+  
+  // Force re-render when language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // Force re-render to update translations
+      forceUpdate({});
+    };
+    
+    window.addEventListener('languageChanged', handleLanguageChange);
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, []);
+  
   return (
     <div className="min-h-screen">
       {/* Hero section */}
       <section className="py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight mb-6">
-            Manage Tasks with <span className="bg-clip-text text-transparent gradient-bg">AI-Powered</span> Efficiency
+            {t("manageTasksWithAI")}
           </h1>
           <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-            SmartTasker helps you organize, prioritize, and complete your tasks with intelligent assistance.
+            {t("appName")} {t("helpsYouOrganize")}
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button asChild size="lg">
-              <Link to="/auth">Get Started</Link>
+              <Link to="/auth">{t("getStarted")}</Link>
             </Button>
             <Button asChild size="lg" variant="outline">
-              <Link to="/dashboard">View Demo</Link>
+              <Link to="/dashboard">{t("viewDemo")}</Link>
             </Button>
           </div>
         </div>
@@ -29,9 +46,9 @@ const Index = () => {
       <section className="py-20 bg-muted/50">
         <div className="max-w-7xl mx-auto px-4">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold mb-4">Why Choose SmartTasker?</h2>
+            <h2 className="text-3xl font-bold mb-4">{t("whyChooseSmartTasker")}</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Our AI-driven task manager helps you stay organized and focused on what matters most.
+              {t("aiDrivenTaskManager")}
             </p>
           </div>
 
@@ -66,12 +83,12 @@ const Index = () => {
       {/* CTA section */}
       <section className="py-20 px-4">
         <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-6">Ready to get started?</h2>
+          <h2 className="text-3xl font-bold mb-6">{t("readyToGetStarted")}</h2>
           <p className="text-xl text-muted-foreground mb-8">
-            Join thousands of users who have transformed their productivity with SmartTasker.
+            {t("joinThousandsOfUsers")}
           </p>
           <Button asChild size="lg">
-            <Link to="/auth">Sign Up Now</Link>
+            <Link to="/auth">{t("signUpNow")}</Link>
           </Button>
         </div>
       </section>
@@ -84,16 +101,16 @@ const Index = () => {
               <div className="h-8 w-8 rounded-full gradient-bg flex items-center justify-center">
                 <span className="font-bold text-white">ST</span>
               </div>
-              <h2 className="ml-2 text-xl font-bold">SmartTasker</h2>
+              <h2 className="ml-2 text-xl font-bold">{t("appName")}</h2>
             </div>
             <div className="flex space-x-6">
-              <a href="#" className="text-muted-foreground hover:text-foreground">Terms</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground">Privacy</a>
-              <a href="#" className="text-muted-foreground hover:text-foreground">Contact</a>
+              <a href="#" className="text-muted-foreground hover:text-foreground">{t("terms")}</a>
+              <a href="#" className="text-muted-foreground hover:text-foreground">{t("privacy")}</a>
+              <a href="#" className="text-muted-foreground hover:text-foreground">{t("contact")}</a>
             </div>
           </div>
           <div className="mt-8 text-center text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} SmartTasker. All rights reserved.
+            &copy; {new Date().getFullYear()} {t("appName")}. {t("allRightsReserved")}
           </div>
         </div>
       </footer>

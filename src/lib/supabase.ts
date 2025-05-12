@@ -1,12 +1,17 @@
-
 import { createClient } from '@supabase/supabase-js';
 
 // Use the same URL and key as in src/integrations/supabase/client.ts
 const supabaseUrl = "https://qoojbxdvdvbwibdkaper.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvb2pieGR2ZHZid2liZGthcGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5MjM5MzgsImV4cCI6MjA2MTQ5OTkzOH0.goflhN-7kpZYqlqtLbPucScTyYs_40nIqANQpk4Tjj8";
 
-// Create a Supabase client
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create a Supabase client with persistent storage
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true,
+  }
+});
 
 // SQL schema for creating the tasks management system tables
 // Note: This is for reference only, tables should be created through Supabase dashboard

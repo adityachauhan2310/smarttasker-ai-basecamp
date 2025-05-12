@@ -7,6 +7,15 @@ import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from "@/components/ui/use-toast";
+import { useSettings } from "@/contexts/SettingsContext";
+import { applyLanguage, t } from "@/lib/i18n";
+import type { Language } from "@/lib/i18n";
+
+interface NotificationPreferences {
+  taskReminders: boolean;
+  emailNotifications: boolean;
+}
 
 const Settings = () => {
   const [name, setName] = useState('');
@@ -14,6 +23,12 @@ const Settings = () => {
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [notificationPrefs, setNotificationPrefs] = useState<NotificationPreferences>({
+    taskReminders: false,
+    emailNotifications: false
+  });
+  const { toast } = useToast();
+  const { preferences, setLanguage, setTimezone, savePreferences, readableTimezone, forceRefresh } = useSettings();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -41,6 +56,30 @@ const Settings = () => {
       setLoading(false);
     };
     fetchProfile();
+    
+    // Load notification preferences from localStorage
+    const savedNotificationPrefs = localStorage.getItem('notificationPreferences');
+    if (savedNotificationPrefs) {
+      try {
+        const prefs = JSON.parse(savedNotificationPrefs) as NotificationPreferences;
+        setNotificationPrefs(prefs);
+      } catch (e) {
+        console.error('Failed to parse saved notification preferences');
+      }
+    }
+
+    // Listen for language change events to refresh the UI
+    const handleLanguageChange = () => {
+      // Force a re-render by updating a state variable
+      setMessage(t("preferencesUpdated"));
+      setTimeout(() => setMessage(""), 3000);
+    };
+
+    window.addEventListener('languageChanged', handleLanguageChange);
+    
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
   }, []);
 
   const handleSave = async () => {
@@ -65,12 +104,83 @@ const Settings = () => {
     setLoading(false);
   };
 
+  const handleSaveAccountPreferences = () => {
+    try {
+      // Save preferences through our context
+      savePreferences();
+      
+      // Force-apply new language to the UI immediately
+      applyLanguage();
+      
+      // Force context refresh to update all components using the context
+      forceRefresh();
+      
+      // Update toast with translated text after language change
+      toast({
+        title: t("success"),
+        description: t("preferencesUpdated"),
+      });
+      
+      // Force re-render of the current component
+      setMessage(t("preferencesUpdated"));
+      setTimeout(() => setMessage(""), 3000);
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: t("error"),
+        description: t("errorSavingPreferences"),
+      });
+    }
+  };
+
+  const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setLanguage(e.target.value as Language);
+  };
+
+  const handleTimezoneChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setTimezone(e.target.value as 'utc' | 'est' | 'pst');
+  };
+
+  const handleSavePreferences = () => {
+    try {
+      // Save notification preferences to localStorage
+      localStorage.setItem('notificationPreferences', JSON.stringify(notificationPrefs));
+      
+      // Request notification permission if taskReminders is enabled
+      if (notificationPrefs.taskReminders && Notification.permission !== 'granted') {
+        Notification.requestPermission().then(permission => {
+          if (permission === 'granted') {
+            toast({
+              title: "Notifications enabled",
+              description: "You will receive notifications for upcoming tasks",
+            });
+          }
+        });
+      }
+      
+      toast({
+        title: "Preferences saved",
+        description: "Your notification preferences have been updated",
+      });
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Error saving preferences",
+        description: "There was a problem saving your preferences",
+      });
+    }
+  };
+
+  const handleReloadApp = () => {
+    window.location.reload();
+  };
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('settings')}</h1>
         <p className="text-muted-foreground">
-          Manage your account settings and preferences.
+          {t('manageAccountPrefs')}
         </p>
       </div>
 
@@ -78,29 +188,29 @@ const Settings = () => {
 
       <Tabs defaultValue="profile" className="w-full">
         <TabsList className="mb-4">
-          <TabsTrigger value="profile">Profile</TabsTrigger>
-          <TabsTrigger value="account">Account</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
+          <TabsTrigger value="profile">{t('profileInformation')}</TabsTrigger>
+          <TabsTrigger value="account">{t('accountSettings')}</TabsTrigger>
+          <TabsTrigger value="notifications">{t('notificationPreferences')}</TabsTrigger>
         </TabsList>
 
         <TabsContent value="profile" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Profile Information</CardTitle>
+              <CardTitle>{t('profileInformation')}</CardTitle>
               <CardDescription>
-                Update your personal information.
+                {t('updatePersonalInfo')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Name</Label>
-                <Input id="name" placeholder="Your name" value={name} onChange={e => setName(e.target.value)} disabled={loading} />
+                <Label htmlFor="name">{t('name')}</Label>
+                <Input id="name" placeholder={t('yourName')} value={name} onChange={e => setName(e.target.value)} disabled={loading} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input id="email" placeholder="Your email" type="email" value={email} disabled />
+                <Label htmlFor="email">{t('email')}</Label>
+                <Input id="email" placeholder={t('yourEmail')} type="email" value={email} disabled />
                 <p className="text-sm text-muted-foreground">
-                  Connect to Supabase to manage your email address.
+                  {t('connectToSupabase')}
                 </p>
               </div>
               {message && <div className="text-green-600 text-sm">{message}</div>}
@@ -108,7 +218,7 @@ const Settings = () => {
             </CardContent>
             <CardFooter>
               <Button onClick={handleSave} disabled={loading}>
-                {loading ? 'Saving...' : 'Save Changes'}
+                {loading ? t('saving') : t('saveChanges')}
               </Button>
             </CardFooter>
           </Card>
@@ -117,38 +227,42 @@ const Settings = () => {
         <TabsContent value="account" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Account Settings</CardTitle>
+              <CardTitle>{t('accountSettings')}</CardTitle>
               <CardDescription>
-                Manage your account preferences.
+                {t('manageAccountPrefs')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="language">Language</Label>
+                <Label htmlFor="language">{t('language')}</Label>
                 <select 
                   id="language"
                   className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={preferences.language}
+                  onChange={handleLanguageChange}
                 >
-                  <option value="en">English</option>
-                  <option value="es">Spanish</option>
-                  <option value="fr">French</option>
+                  <option value="en">{t('english')}</option>
+                  <option value="es">{t('spanish')}</option>
+                  <option value="fr">{t('french')}</option>
                 </select>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="timezone">Timezone</Label>
+                <Label htmlFor="timezone">{t('timezone')}</Label>
                 <select 
                   id="timezone"
                   className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  value={preferences.timezone}
+                  onChange={handleTimezoneChange}
                 >
-                  <option value="utc">UTC (Coordinated Universal Time)</option>
-                  <option value="est">EST (Eastern Standard Time)</option>
-                  <option value="pst">PST (Pacific Standard Time)</option>
+                  <option value="utc">{t('utc')}</option>
+                  <option value="est">{t('est')}</option>
+                  <option value="pst">{t('pst')}</option>
                 </select>
               </div>
             </CardContent>
             <CardFooter>
-              <Button>
-                Save Changes
+              <Button onClick={handleSaveAccountPreferences}>
+                {t('saveChanges')}
               </Button>
             </CardFooter>
           </Card>
@@ -157,45 +271,47 @@ const Settings = () => {
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
+              <CardTitle>{t('notificationPreferences')}</CardTitle>
               <CardDescription>
-                Control how you receive notifications.
+                {t('controlNotifications')}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="email-notifications">Email Notifications</Label>
+                  <Label htmlFor="email-notifications">{t('emailNotifications')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Receive notifications via email.
+                    {t('receiveViaEmail')}
                   </p>
                 </div>
-                <Switch id="email-notifications" />
+                <Switch 
+                  id="email-notifications" 
+                  checked={notificationPrefs.emailNotifications}
+                  onCheckedChange={(checked) => 
+                    setNotificationPrefs(prev => ({ ...prev, emailNotifications: checked }))
+                  }
+                />
               </div>
               <Separator />
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
-                  <Label htmlFor="task-reminders">Task Reminders</Label>
+                  <Label htmlFor="task-reminders">{t('taskReminders')}</Label>
                   <p className="text-sm text-muted-foreground">
-                    Get reminded about upcoming tasks.
+                    {t('getRemindedTasks')}
                   </p>
                 </div>
-                <Switch id="task-reminders" />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="newsletter">Newsletter</Label>
-                  <p className="text-sm text-muted-foreground">
-                    Receive our newsletter with tips and updates.
-                  </p>
-                </div>
-                <Switch id="newsletter" />
+                <Switch 
+                  id="task-reminders" 
+                  checked={notificationPrefs.taskReminders}
+                  onCheckedChange={(checked) => 
+                    setNotificationPrefs(prev => ({ ...prev, taskReminders: checked }))
+                  }
+                />
               </div>
             </CardContent>
             <CardFooter>
-              <Button>
-                Save Preferences
+              <Button onClick={handleSavePreferences}>
+                {t('savePreferences')}
               </Button>
             </CardFooter>
           </Card>

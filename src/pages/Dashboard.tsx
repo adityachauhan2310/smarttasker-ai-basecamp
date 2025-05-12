@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { PlusCircle, BarChart3, LineChart, Users } from "lucide-react";
@@ -9,6 +9,7 @@ import StatisticsChart from "@/components/dashboard/StatisticsChart";
 import ProfileCard from "@/components/dashboard/ProfileCard";
 import ChatWidget from "@/components/dashboard/ChatWidget";
 import NewTaskDialog from "@/components/NewTaskDialog";
+import { NotificationBell } from "@/components/NotificationBell";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
@@ -16,16 +17,92 @@ import { useDemo } from '@/contexts/DemoContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { Task } from '@/types/task';
 import { useTasksData } from '@/hooks/useTasksData';
+import { useToast } from "@/components/ui/use-toast";
+import { t } from "@/lib/i18n";
+
+// Track notifications that have already been shown to avoid duplicates
+const notifiedTaskIds = new Set<string>();
 
 const Dashboard = () => {
   const [isNewTaskDialogOpen, setIsNewTaskDialogOpen] = useState(false);
   const { tasks, loading } = useTasksData();
   const { isDemo, tasks: demoTasks } = useDemo();
   const { user } = useAuth();
+  const { toast } = useToast();
+  const intervalRef = useRef<number | null>(null);
   
   const todoTasks = tasks.filter(task => task.status === 'todo');
   const inProgressTasks = tasks.filter(task => task.status === 'in-progress');
   const doneTasks = tasks.filter(task => task.status === 'done');
+
+  // Function to check tasks that are due soon
+  const checkDueTasks = () => {
+    // Check if task reminders are enabled
+    const notificationPrefs = localStorage.getItem('notificationPreferences');
+    if (!notificationPrefs) return;
+    
+    const { taskReminders } = JSON.parse(notificationPrefs);
+    if (!taskReminders) return;
+    
+    const now = new Date();
+    const tenMinutesFromNow = new Date(now.getTime() + 10 * 60000);
+    
+    const dueTasks = tasks.filter(task => {
+      // Skip already notified tasks
+      if (notifiedTaskIds.has(task.id)) return false;
+      
+      // Skip tasks that don't have a due date or are already completed
+      if (!task.dueDate || task.status === 'done') return false;
+      
+      const dueDate = new Date(task.dueDate);
+      
+      // Task is either overdue or due within the next 10 minutes
+      return dueDate <= tenMinutesFromNow;
+    });
+    
+    // Show notifications for due tasks
+    dueTasks.forEach(task => {
+      // Mark this task as notified so we don't show it again
+      notifiedTaskIds.add(task.id);
+      
+      // Show toast notification
+      toast({
+        title: `Task ${new Date(task.dueDate) < now ? 'Overdue' : 'Due Soon'}`,
+        description: task.title,
+        variant: "destructive",
+      });
+      
+      // Show browser notification if permissions are granted
+      if (Notification.permission === 'granted') {
+        new Notification(`Task ${new Date(task.dueDate) < now ? 'Overdue' : 'Due Soon'}`, {
+          body: task.title,
+          icon: '/favicon.ico'
+        });
+      }
+    });
+  };
+  
+  // Set up notification interval and request permissions
+  useEffect(() => {
+    // Request notification permissions on first render if not already granted
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+      Notification.requestPermission();
+    }
+    
+    // Check for due tasks immediately
+    checkDueTasks();
+    
+    // Set up interval to check for due tasks every minute
+    const interval = window.setInterval(checkDueTasks, 60000);
+    intervalRef.current = interval;
+    
+    // Clean up interval on unmount
+    return () => {
+      if (intervalRef.current) {
+        window.clearInterval(intervalRef.current);
+      }
+    };
+  }, [tasks]);
 
   // Calculate task statistics
   const tasksStats = {
@@ -60,22 +137,25 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <Button onClick={() => setIsNewTaskDialogOpen(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> New Task
-        </Button>
+        <h1 className="text-3xl font-bold tracking-tight">{t("dashboard")}</h1>
+        <div className="flex items-center gap-2">
+          <NotificationBell tasks={tasks} />
+          <Button onClick={() => setIsNewTaskDialogOpen(true)}>
+            <PlusCircle className="mr-2 h-4 w-4" /> {t("newTask")}
+          </Button>
+        </div>
       </div>
 
       {isDemo && !user && (
         <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-4">
-          <p>You are viewing the demo version with sample data.</p>
+          <p>{t("viewingDemoVersion")}</p>
         </div>
       )}
 
       {/* Empty state for real users with no tasks */}
       {user && tasks.length === 0 && (
         <div className="bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4 mb-4">
-          <p>You have no tasks yet. Click "New Task" to get started!</p>
+          <p>{t("noTasksYet")}</p>
         </div>
       )}
 
@@ -88,7 +168,7 @@ const Dashboard = () => {
         <motion.div variants={item}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Total Tasks</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("totalTasks")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{tasksStats.total}</div>
@@ -99,7 +179,7 @@ const Dashboard = () => {
         <motion.div variants={item}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Completed</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("completed")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">{tasksStats.completed}</div>
@@ -110,7 +190,7 @@ const Dashboard = () => {
         <motion.div variants={item}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Upcoming</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("upcoming")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-blue-600">{tasksStats.upcoming}</div>
@@ -121,7 +201,7 @@ const Dashboard = () => {
         <motion.div variants={item}>
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">Overdue</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">{t("overdue")}</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-red-600">{tasksStats.overdue}</div>
@@ -173,87 +253,12 @@ const Dashboard = () => {
 
       <div className="grid gap-6 md:grid-cols-2">
         <RecurringTaskGenerator />
-        
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4, delay: 0.6 }}
-        >
-          <Card className="h-full">
-            <CardHeader>
-              <CardTitle>Team Activity</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="flex items-center gap-4">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback>{String.fromCharCode(65 + i)}</AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">User {String.fromCharCode(65 + i)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {i % 2 === 0 ? "Completed task" : "Created new task"} {Math.floor(Math.random() * 30) + 1} minutes ago
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        </motion.div>
-      </div>
-
-      <div className="grid gap-6 md:grid-cols-3">
-        <Card>
-          <CardHeader>
-            <CardTitle>To Do</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {todoTasks.map(task => (
-                <div key={task.id} className="p-2 border rounded">
-                  <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-500">{task.description}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>In Progress</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {inProgressTasks.map(task => (
-                <div key={task.id} className="p-2 border rounded">
-                  <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-500">{task.description}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Done</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {doneTasks.map(task => (
-                <div key={task.id} className="p-2 border rounded">
-                  <h3 className="font-medium">{task.title}</h3>
-                  <p className="text-sm text-gray-500">{task.description}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+        <ChatWidget />
       </div>
 
       <NewTaskDialog 
-        open={isNewTaskDialogOpen}
-        onOpenChange={setIsNewTaskDialogOpen}
-        allTasks={tasks}
+        open={isNewTaskDialogOpen} 
+        onOpenChange={setIsNewTaskDialogOpen} 
       />
     </div>
   );

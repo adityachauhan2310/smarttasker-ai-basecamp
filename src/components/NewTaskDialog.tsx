@@ -155,6 +155,7 @@ const NewTaskDialog = ({ open, onOpenChange, allTasks = [] }: NewTaskDialogProps
       });
       form.reset();
       setSelectedDependencies([]);
+      setDueTime('');
     },
     onError: (error: any) => {
       console.error('Error creating task:', error);

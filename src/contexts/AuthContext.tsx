@@ -1,9 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { User } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 
 type AuthContextType = {
   user: User | null;
+  session: Session | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
@@ -14,6 +15,7 @@ type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
+  session: null,
   loading: true,
   signIn: async () => {},
   signUp: async () => {},
@@ -24,32 +26,61 @@ const AuthContext = createContext<AuthContextType>({
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check active sessions and sets the user
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-      // Ensure profile exists for the user (fire-and-forget)
-      if (session?.user) {
-        supabase.from('profiles').upsert({ id: session.user.id, name: session.user.email?.split('@')[0] || 'New User' })
-          .then(({ error }) => { if (error) console.error('Profile upsert error:', error); });
+    const loadUserSession = async () => {
+      try {
+        // Check for existing session in localStorage first
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          setSession(session);
+          setUser(session.user || null);
+        } else {
+          setSession(null);
+          setUser(null);
+        }
+      } catch (error) {
+        console.error('Error loading user session:', error);
+        setSession(null);
+        setUser(null);
+      } finally {
+        setLoading(false);
       }
-    });
+    };
 
-    // Listen for changes on auth state (sign in, sign out, etc.)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-      setLoading(false);
-      // Ensure profile exists for the user (fire-and-forget)
-      if (session?.user) {
-        supabase.from('profiles').upsert({ id: session.user.id, name: session.user.email?.split('@')[0] || 'New User' })
-          .then(({ error }) => { if (error) console.error('Profile upsert error:', error); });
+    // Load session on initial render
+    loadUserSession();
+
+    // Listen for auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        setSession(session);
+        setUser(session?.user || null);
+        setLoading(false);
+
+        // Ensure profile exists for the user (fire-and-forget)
+        if (session?.user) {
+          supabase
+            .from('profiles')
+            .upsert({ 
+              id: session.user.id, 
+              name: session.user.email?.split('@')[0] || 'New User',
+              updated_at: new Date(),
+            })
+            .then(({ error }) => { 
+              if (error) console.error('Profile upsert error:', error); 
+            });
+        }
       }
-    });
+    );
 
-    return () => subscription.unsubscribe();
+    // Cleanup subscription on component unmount
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -69,6 +100,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
+    // Clear session from state first for better UX
+    setUser(null);
+    setSession(null);
+    
+    // Then sign out from Supabase
     await supabase.auth.signOut();
   };
 
@@ -91,6 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
+    session,
     loading,
     signIn,
     signUp,

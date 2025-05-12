@@ -1,12 +1,26 @@
-
 import { Outlet } from "react-router-dom";
 import Sidebar from "./Sidebar";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Menu } from "lucide-react";
+import { t } from "@/lib/i18n";
 
 export default function MainLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [, forceUpdate] = useState({});
+  
+  // Force re-render when language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // Force re-render to update translations
+      forceUpdate({});
+    };
+    
+    window.addEventListener('languageChanged', handleLanguageChange);
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, []);
 
   return (
     <div className="flex h-screen bg-background">
@@ -21,7 +35,7 @@ export default function MainLayout() {
           >
             <Menu className="h-6 w-6" />
           </Button>
-          <h1 className="text-xl font-semibold ml-4">SmartTasker</h1>
+          <h1 className="text-xl font-semibold ml-4">{t("appName")}</h1>
         </header>
         
         <main className="flex-1 overflow-auto p-4 md:p-8">

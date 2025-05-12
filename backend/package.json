@@ -1,0 +1,19 @@
+{
+  "name": "smarttasker-backend",
+  "version": "1.0.0",
+  "description": "Backend services for SmartTasker application",
+  "main": "taskNotifier.js",
+  "scripts": {
+    "start": "node taskNotifier.js",
+    "dev": "nodemon taskNotifier.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.39.0",
+    "dotenv": "^16.3.1",
+    "node-cron": "^3.0.3",
+    "nodemailer": "^6.9.7"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  }
+} 

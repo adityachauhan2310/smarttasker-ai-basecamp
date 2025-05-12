@@ -9,8 +9,11 @@ import {
   X,
   LogIn,
   LogOut,
-  MessageSquare
+  MessageSquare,
+  Bell
 } from "lucide-react";
+import { t } from "@/lib/i18n";
+import { useEffect, useState } from "react";
 
 type SidebarProps = {
   open: boolean;
@@ -21,6 +24,20 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, signOut } = useAuth();
+  const [, forceUpdate] = useState({});
+  
+  // Force re-render when language changes
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // Force re-render to update translations
+      forceUpdate({});
+    };
+    
+    window.addEventListener('languageChanged', handleLanguageChange);
+    return () => {
+      window.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, []);
   
   const handleLogout = async () => {
     await signOut();
@@ -31,22 +48,27 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
 
   const navigation = [
     {
-      name: "Dashboard",
+      name: t("dashboard"),
       path: "/dashboard",
       icon: LayoutDashboard,
     },
     {
-      name: "Tasks",
+      name: t("tasks"),
       path: "/tasks",
       icon: CheckSquare,
     },
     {
-      name: "Chat",
+      name: t("notifications"),
+      path: "/notifications",
+      icon: Bell,
+    },
+    {
+      name: t("chat"),
       path: "/chat",
       icon: MessageSquare,
     },
     {
-      name: "Settings",
+      name: t("settings"),
       path: "/settings",
       icon: Settings,
     },
@@ -75,7 +97,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               <div className="h-8 w-8 rounded-full gradient-bg flex items-center justify-center">
                 <span className="font-bold text-white">ST</span>
               </div>
-              <h1 className="text-xl font-bold text-foreground">SmartTasker</h1>
+              <h1 className="text-xl font-bold text-foreground">{t("appName")}</h1>
             </Link>
           </div>
           <Button
@@ -124,7 +146,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
                   onClick={handleLogout}
                 >
                   <LogOut className="mr-2 h-5 w-5" />
-                  Sign Out
+                  {t("signOut")}
                 </Button>
               </div>
             ) : (
@@ -135,7 +157,7 @@ export default function Sidebar({ open, setOpen }: SidebarProps) {
               >
                 <Link to="/auth">
                   <LogIn className="mr-2 h-5 w-5" />
-                  Sign In
+                  {t("signIn")}
                 </Link>
               </Button>
             )}
