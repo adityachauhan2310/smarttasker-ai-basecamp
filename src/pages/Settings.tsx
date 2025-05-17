@@ -11,6 +11,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { useSettings } from "@/contexts/SettingsContext";
 import { applyLanguage, t } from "@/lib/i18n";
 import type { Language } from "@/lib/i18n";
+import { useTheme } from "@/components/theme-provider";
+import { SunIcon, MoonIcon } from "lucide-react";
 
 interface NotificationPreferences {
   taskReminders: boolean;
@@ -29,6 +31,7 @@ const Settings = () => {
   });
   const { toast } = useToast();
   const { preferences, setLanguage, setTimezone, savePreferences, readableTimezone, forceRefresh } = useSettings();
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -209,9 +212,6 @@ const Settings = () => {
               <div className="space-y-2">
                 <Label htmlFor="email">{t('email')}</Label>
                 <Input id="email" placeholder={t('yourEmail')} type="email" value={email} disabled />
-                <p className="text-sm text-muted-foreground">
-                  {t('connectToSupabase')}
-                </p>
               </div>
               {message && <div className="text-green-600 text-sm">{message}</div>}
               {error && <div className="text-red-600 text-sm">{error}</div>}
@@ -229,40 +229,81 @@ const Settings = () => {
             <CardHeader>
               <CardTitle>{t('accountSettings')}</CardTitle>
               <CardDescription>
-                {t('manageAccountPrefs')}
+                {t('manageAccountSettings')}
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="language">{t('language')}</Label>
-                <select 
-                  id="language"
-                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={preferences.language}
-                  onChange={handleLanguageChange}
-                >
-                  <option value="en">{t('english')}</option>
-                  <option value="es">{t('spanish')}</option>
-                  <option value="fr">{t('french')}</option>
-                </select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="timezone">{t('timezone')}</Label>
-                <select 
-                  id="timezone"
-                  className="w-full flex h-10 rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                  value={preferences.timezone}
-                  onChange={handleTimezoneChange}
-                >
-                  <option value="utc">{t('utc')}</option>
-                  <option value="est">{t('est')}</option>
-                  <option value="pst">{t('pst')}</option>
-                </select>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <div className="flex flex-col gap-4 md:flex-row md:gap-8">
+                      <div className="space-y-1 w-full">
+                        <Label htmlFor="language" className="font-medium">{t('language')}</Label>
+                        <select 
+                          id="language" 
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={preferences.language}
+                          onChange={handleLanguageChange}
+                        >
+                          <option value="en">English</option>
+                          <option value="es">Español</option>
+                          <option value="fr">Français</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1 w-full">
+                        <Label htmlFor="timezone" className="font-medium">{t('timezone')}</Label>
+                        <select 
+                          id="timezone" 
+                          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                          value={preferences.timezone}
+                          onChange={handleTimezoneChange}
+                        >
+                          <option value="utc">UTC</option>
+                          <option value="est">EST (UTC-5)</option>
+                          <option value="pst">PST (UTC-8)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <Separator className="my-6" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold">{t('appearance')}</h3>
+                    <div className="flex items-center justify-between py-2">
+                      <div className="flex items-center space-x-2">
+                        <span className="relative inline-flex items-center">
+                          <span className={`transition-transform duration-300 ${theme === 'dark' ? 'opacity-100 scale-100' : 'opacity-0 scale-75'} text-yellow-400`}><SunIcon className="h-6 w-6" /></span>
+                          <span className={`transition-transform duration-300 absolute left-0 ${theme === 'dark' ? 'opacity-0 scale-75' : 'opacity-100 scale-100'} text-blue-400`}><MoonIcon className="h-6 w-6" /></span>
+                        </span>
+                        <Label htmlFor="theme-toggle" className="font-medium">{t('darkMode')}</Label>
+                      </div>
+                      <button
+                        id="theme-toggle"
+                        type="button"
+                        aria-pressed={theme === 'dark'}
+                        onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+                        className={`relative w-16 h-8 rounded-full transition-all duration-300 focus:outline-none border-2 border-primary/40
+                          ${theme === 'dark' ? 'bg-gradient-to-r from-blue-900 via-blue-700 to-blue-500 shadow-[0_0_16px_2px_rgba(59,130,246,0.3)]' : 'bg-gradient-to-r from-yellow-200 via-yellow-400 to-yellow-500 shadow-[0_0_12px_2px_rgba(253,224,71,0.25)]'}
+                          hover:scale-105 hover:shadow-lg`}
+                      >
+                        <span
+                          className={`absolute top-1/2 left-1 w-6 h-6 rounded-full bg-white shadow-md transition-transform duration-300
+                            ${theme === 'dark' ? 'translate-x-8' : 'translate-x-0'}
+                            border-2 border-primary/30
+                          `}
+                          style={{ transform: `translateY(-50%) ${theme === 'dark' ? 'translateX(2rem)' : 'translateX(0)'}` }}
+                        />
+                      </button>
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      {theme === 'dark' ? t('darkModeEnabled') : t('lightModeEnabled')}
+                    </p>
+                  </div>
+                </div>
               </div>
             </CardContent>
-            <CardFooter>
-              <Button onClick={handleSaveAccountPreferences}>
-                {t('saveChanges')}
+            <CardFooter className="flex justify-end">
+              <Button onClick={handleSaveAccountPreferences} className="px-6 py-2 text-base font-semibold rounded-lg shadow-md">
+                {t('saveSettings')}
               </Button>
             </CardFooter>
           </Card>

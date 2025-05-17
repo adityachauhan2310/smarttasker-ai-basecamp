@@ -178,8 +178,16 @@ function chatReducer(state: ChatState, action: ChatAction): ChatState {
 
 const ChatContext = createContext<ChatContextValue | undefined>(undefined);
 
+// Use GROQ_API_KEY from environment or undefined to trigger mock client
+const groqApiKey = import.meta.env.VITE_GROQ_API_KEY || undefined;
+
+// Log a warning if API key is missing
+if (!groqApiKey) {
+  console.warn("WARN: GROQ API key not found. Using mock GROQ client. Add VITE_GROQ_API_KEY to your .env file for production use.");
+}
+
 const groqClient = createGroqClient({
-  apiKey: import.meta.env.VITE_GROQ_API_KEY,
+  apiKey: groqApiKey,
 });
 
 export function ChatProvider({ children }: { children: ReactNode }) {

@@ -15,10 +15,41 @@
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
+    
+    <style>
+      #fallback {
+        display: none;
+        padding: 20px;
+        margin: 20px;
+        border: 2px solid red;
+        border-radius: 8px;
+      }
+      .error-title {
+        color: #d00;
+        font-size: 24px;
+        margin-bottom: 16px;
+      }
+    </style>
   </head>
 
   <body>
     <div id="root"></div>
+    <div id="fallback">
+      <h1 class="error-title">Application Failed to Load</h1>
+      <p>There was a problem loading the application. This message appears if React failed to render within 5 seconds.</p>
+      <p>Please check your browser console for errors.</p>
+    </div>
+    
+    <script>
+      // Show fallback content if the app doesn't render within 5 seconds
+      setTimeout(function() {
+        if (document.getElementById('root').children.length === 0) {
+          console.error('React application failed to render within timeout period');
+          document.getElementById('fallback').style.display = 'block';
+        }
+      }, 5000);
+    </script>
+    
     <!-- IMPORTANT: DO NOT REMOVE THIS SCRIPT TAG OR THIS VERY COMMENT! -->
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>

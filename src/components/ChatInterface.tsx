@@ -30,32 +30,33 @@ const ChatInterface = () => {
   };
 
   return (
-    <Card className="flex flex-col h-[600px] w-full max-w-2xl mx-auto">
+    <Card className="flex flex-col h-[70vh] w-full max-w-2xl mx-auto bg-[rgba(30,41,59,0.85)] backdrop-blur-md rounded-2xl shadow-2xl border border-primary/10 animate-fade-in-up transition-all duration-500">
       <div className="flex items-center justify-between px-4 pt-4">
         <span className="font-semibold text-lg">Chat</span>
         <Button
           type="button"
-          variant="secondary"
+          variant="ghost"
           size="sm"
+          className="rounded-full px-4 py-1 bg-muted/60 hover:bg-primary/80 hover:text-white transition-colors duration-300 shadow"
           onClick={clearChat}
         >
           Clear Chat
         </Button>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
         <div className="space-y-4">
           {state.messages.map((message) => (
             <div
               key={message.id}
               className={`flex flex-col mb-4 ${
                 message.role === 'user' ? 'items-end' : 'items-start'
-              }`}
+              } animate-fade-in`}
             >
               <div
-                className={`max-w-[80%] rounded-lg p-3 ${
+                className={`max-w-[80%] rounded-xl p-3 shadow-md transition-all duration-300 ${
                   message.role === 'user'
                     ? 'bg-primary text-primary-foreground'
-                    : 'bg-muted'
+                    : 'bg-muted/80 text-foreground'
                 }`}
               >
                 <p className="text-sm whitespace-pre-wrap">{message.content}</p>
@@ -80,14 +81,14 @@ const ChatInterface = () => {
       </div>
       <form
         onSubmit={handleSubmit}
-        className="border-t p-4 flex items-center gap-2"
+        className="border-t p-4 flex items-center gap-2 bg-background/80 rounded-b-2xl"
       >
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
           placeholder="Type your message..."
           disabled={state.isLoading}
-          className="flex-1"
+          className="flex-1 focus:ring-2 focus:ring-primary/60 focus:border-primary/60 transition-all duration-300 bg-background/80 rounded-lg"
         />
         <Button
           type="submit"

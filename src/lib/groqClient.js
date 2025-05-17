@@ -4,6 +4,9 @@
  * rate limiting, and response caching.
  */
 
+// Add debug logging
+console.log("Loading groqClient.js module");
+
 /**
  * @typedef {Object} GroqConfig
  * @property {string} apiKey - The Groq API key
@@ -30,7 +33,7 @@
  *   maxRetries: 3
  * });
  */
-export function createGroqClient(config) {
+export function createGroqClient(config = {}) {
   const {
     apiKey,
     model = 'llama3-8b-8192',
@@ -39,8 +42,12 @@ export function createGroqClient(config) {
     cacheTTL = 24 * 60 * 60 * 1000
   } = config;
 
+  console.log("Creating Groq client with API key:", apiKey ? "Key provided" : "No key provided");
+
+  // If no API key is provided, return a mock implementation
   if (!apiKey) {
-    throw new Error('Groq API key is required');
+    console.warn("No Groq API key provided, using mock implementation instead");
+    return createMockGroqClient();
   }
 
   // In-memory response cache
@@ -152,6 +159,51 @@ export function createGroqClient(config) {
   // Clean cache periodically
   setInterval(cleanCache, cacheTTL);
 
+  return {
+    generateCompletion,
+    cleanCache
+  };
+}
+
+/**
+ * Creates a mock Groq client implementation for development/testing
+ */
+function createMockGroqClient() {
+  console.log("Created mock Groq client");
+  
+  async function generateCompletion(prompt, options = {}) {
+    console.log("Mock Groq client called with prompt:", prompt);
+    
+    // Simulate a network delay
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
+    // For chat prompts that expect JSON
+    if (prompt.includes('You are a smart task assistant')) {
+      return {
+        content: `{"action": "other", "response": "This is a mock response. I can help you manage your tasks."}`,
+        metadata: {
+          tokens: { total: 20, completion: 15, prompt: 5 },
+          latency: "100ms",
+          model: "mock-model"
+        }
+      };
+    }
+    
+    // Default response
+    return {
+      content: "This is a mock response from the Groq client.",
+      metadata: {
+        tokens: { total: 20, completion: 15, prompt: 5 },
+        latency: "100ms",
+        model: "mock-model"
+      }
+    };
+  }
+  
+  function cleanCache() {
+    // No-op for mock client
+  }
+  
   return {
     generateCompletion,
     cleanCache

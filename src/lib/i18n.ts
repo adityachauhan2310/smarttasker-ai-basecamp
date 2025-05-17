@@ -1,5 +1,8 @@
 // Simple i18n utility for SmartTasker
 
+// Add at the beginning of the file
+console.log("Loading i18n.ts module");
+
 // Define the available languages
 export type Language = 'en' | 'es' | 'fr';
 
@@ -16,6 +19,7 @@ const translations: Record<Language, TranslationDictionary> = {
     save: 'Save',
     saveChanges: 'Save Changes',
     savePreferences: 'Save Preferences',
+    saveSettings: 'Save Settings',
     cancel: 'Cancel',
     loading: 'Loading...',
     saving: 'Saving...',
@@ -75,6 +79,13 @@ const translations: Record<Language, TranslationDictionary> = {
     timezone: 'Timezone',
     emailNotifications: 'Email Notifications',
     taskReminders: 'Task Reminders',
+    appearance: 'Appearance',
+    darkMode: 'Dark Mode',
+    darkModeEnabled: 'Dark mode is enabled.',
+    lightModeEnabled: 'Light mode is enabled.',
+    manageAccountSettings: 'Manage your account settings and appearance.',
+    reloadToApply: 'Some settings may require a reload to fully apply.',
+    reloadApp: 'Reload App',
     updatePersonalInfo: 'Update your personal information.',
     manageAccountPrefs: 'Manage your account settings and preferences.',
     controlNotifications: 'Control how you receive notifications.',
@@ -139,6 +150,7 @@ const translations: Record<Language, TranslationDictionary> = {
     save: 'Guardar',
     saveChanges: 'Guardar Cambios',
     savePreferences: 'Guardar Preferencias',
+    saveSettings: 'Guardar Configuración',
     cancel: 'Cancelar',
     loading: 'Cargando...',
     saving: 'Guardando...',
@@ -198,6 +210,13 @@ const translations: Record<Language, TranslationDictionary> = {
     timezone: 'Zona horaria',
     emailNotifications: 'Notificaciones por correo',
     taskReminders: 'Recordatorios de tareas',
+    appearance: 'Apariencia',
+    darkMode: 'Modo Oscuro',
+    darkModeEnabled: 'El modo oscuro está activado.',
+    lightModeEnabled: 'El modo claro está activado.',
+    manageAccountSettings: 'Administra tu configuración de cuenta y apariencia.',
+    reloadToApply: 'Algunos ajustes pueden requerir recargar para aplicarse completamente.',
+    reloadApp: 'Recargar Aplicación',
     updatePersonalInfo: 'Actualiza tu información personal.',
     manageAccountPrefs: 'Administra tus preferencias de cuenta.',
     controlNotifications: 'Controla cómo recibes notificaciones.',
@@ -262,6 +281,7 @@ const translations: Record<Language, TranslationDictionary> = {
     save: 'Enregistrer',
     saveChanges: 'Enregistrer les modifications',
     savePreferences: 'Enregistrer les préférences',
+    saveSettings: 'Enregistrer les paramètres',
     cancel: 'Annuler',
     loading: 'Chargement...',
     saving: 'Enregistrement...',
@@ -321,6 +341,13 @@ const translations: Record<Language, TranslationDictionary> = {
     timezone: 'Fuseau horaire',
     emailNotifications: 'Notifications par email',
     taskReminders: 'Rappels de tâches',
+    appearance: 'Apparence',
+    darkMode: 'Mode sombre',
+    darkModeEnabled: 'Le mode sombre est activé.',
+    lightModeEnabled: 'Le mode clair est activé.',
+    manageAccountSettings: 'Gérez vos paramètres de compte et d\'apparence.',
+    reloadToApply: 'Certains paramètres peuvent nécessiter un rechargement pour être entièrement appliqués.',
+    reloadApp: 'Recharger l\'application',
     updatePersonalInfo: 'Mettez à jour vos informations personnelles.',
     manageAccountPrefs: 'Gérez vos préférences de compte.',
     controlNotifications: 'Contrôlez comment vous recevez les notifications.',
@@ -418,47 +445,36 @@ export function t(key: string): string {
  * Apply language settings to HTML document
  */
 export function applyLanguage(): void {
-  const language = getCurrentLanguage();
-  document.documentElement.lang = language;
-  
-  // Update any HTML elements with data-i18n attributes
-  const elements = document.querySelectorAll('[data-i18n]');
-  elements.forEach(element => {
-    const key = element.getAttribute('data-i18n');
-    if (key) {
-      element.textContent = t(key);
-    }
-  });
-
-  // Force re-render by triggering a custom event that components can listen to
-  window.dispatchEvent(new CustomEvent('languageChanged', { 
-    detail: { language } 
-  }));
-  
-  // Also dispatch a storage event for cross-tab communication
-  window.dispatchEvent(new Event('storage'));
+  try {
+    console.log("Applying language translations");
+    const language = getCurrentLanguage();
+    console.log("Current language:", language);
+    
+    // Dispatch event for components to update
+    const event = new CustomEvent('languageChanged', { detail: { language } });
+    window.dispatchEvent(event);
+    console.log("Dispatched languageChanged event");
+  } catch (error) {
+    console.error("Error applying language:", error);
+  }
 }
 
 /**
  * Initialize i18n module (call this at app startup)
  */
 export function initializeI18n(): void {
-  applyLanguage();
-  
-  // Set up observer to update translations when the DOM changes
-  // (for dynamic content or SPA page transitions)
-  if (typeof MutationObserver !== 'undefined') {
-    const observer = new MutationObserver((mutations) => {
-      mutations.forEach(mutation => {
-        if (mutation.type === 'childList') {
-          applyLanguage();
-        }
-      });
-    });
+  console.log("Initializing i18n system");
+  try {
+    const savedLanguage = localStorage.getItem('language') as Language || 'en';
+    console.log("Retrieved language from localStorage:", savedLanguage);
     
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true
-    });
+    document.documentElement.lang = savedLanguage;
+    console.log("Set document language attribute to:", savedLanguage);
+    
+    // Apply translations for saved language
+    applyLanguage();
+    console.log("Applied language translations");
+  } catch (error) {
+    console.error("Error initializing i18n:", error);
   }
 } 

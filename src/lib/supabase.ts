@@ -1,15 +1,22 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Use the same URL and key as in src/integrations/supabase/client.ts
-const supabaseUrl = "https://qoojbxdvdvbwibdkaper.supabase.co";
-const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvb2pieGR2ZHZid2liZGthcGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5MjM5MzgsImV4cCI6MjA2MTQ5OTkzOH0.goflhN-7kpZYqlqtLbPucScTyYs_40nIqANQpk4Tjj8";
+// Get the environment variables from .env file
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || "https://qoojbxdvdvbwibdkaper.supabase.co";
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFvb2pieGR2ZHZid2liZGthcGVyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDU5MjM5MzgsImV4cCI6MjA2MTQ5OTkzOH0.goflhN-7kpZYqlqtLbPucScTyYs_40nIqANQpk4Tjj8";
+
+// Log a warning if using fallback values
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn("WARN: Using fallback Supabase credentials. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to your .env file for production use.");
+}
 
 // Create a Supabase client with persistent storage
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
-    storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    storage: localStorage,
+    storageKey: 'smarttasker-auth-token',
+    detectSessionInUrl: true,
   }
 });
 

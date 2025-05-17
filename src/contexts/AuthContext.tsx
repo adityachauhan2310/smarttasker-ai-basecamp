@@ -32,13 +32,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const loadUserSession = async () => {
       try {
+        console.log('Loading user session...');
         // Check for existing session in localStorage first
-        const { data: { session } } = await supabase.auth.getSession();
+        const { data, error } = await supabase.auth.getSession();
         
-        if (session) {
-          setSession(session);
-          setUser(session.user || null);
+        if (error) {
+          console.error('Error getting session:', error);
+          throw error;
+        }
+        
+        if (data?.session) {
+          console.log('Session found:', data.session.user.email);
+          setSession(data.session);
+          setUser(data.session.user);
         } else {
+          console.log('No active session found');
           setSession(null);
           setUser(null);
         }
@@ -56,7 +64,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('Auth state changed:', event, session?.user?.email);
         setSession(session);
         setUser(session?.user || null);
         setLoading(false);
@@ -68,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .upsert({ 
               id: session.user.id, 
               name: session.user.email?.split('@')[0] || 'New User',
-              updated_at: new Date(),
+              updated_at: new Date().toISOString(),
             })
             .then(({ error }) => { 
               if (error) console.error('Profile upsert error:', error); 
@@ -84,28 +93,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signUp = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-    });
-    if (error) throw error;
+    try {
+      setLoading(true);
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const signOut = async () => {
-    // Clear session from state first for better UX
-    setUser(null);
-    setSession(null);
-    
-    // Then sign out from Supabase
-    await supabase.auth.signOut();
+    try {
+      setLoading(true);
+      // Clear session from state first for better UX
+      setUser(null);
+      setSession(null);
+      
+      // Then sign out from Supabase
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetPassword = async (email: string) => {

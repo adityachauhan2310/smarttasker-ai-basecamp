@@ -129,7 +129,7 @@ const TaskItem: React.FC<TaskItemProps> = ({ task, allTasks, onStatusChange, onP
       <tr className="group">
         <td className="py-4">
           <span
-            className="cursor-pointer text-white no-underline hover:underline text-primary"
+            className="cursor-pointer no-underline hover:underline text-primary"
             onClick={() => setShowDetails(true)}
             tabIndex={0}
             role="button"
